@@ -1,0 +1,116 @@
+{
+  "algorithm": "uuidv5",
+  "namespace": "dbbccf96-b845-55a8-b336-67a2996b053c",
+  "namespaceDerivation": {
+    "namespace": "6ba7b811-9dad-11d1-80b4-00c04fd430c8",
+    "name": "https://example.com/rich-feed/legacy-post-identity/v1"
+  },
+  "vectors": [
+    {
+      "label": "A",
+      "key": "https://posts.example.com/authors/ada/posts/1001",
+      "alias": "urn:uuid:69f10a5e-8115-56eb-9d22-d7c2280512ad"
+    },
+    {
+      "label": "B",
+      "key": "https://Posts.example.com/authors/ada/posts/1001",
+      "alias": "urn:uuid:2bc8dd8a-cd41-5f8a-8393-3157cfe56e12"
+    },
+    {
+      "label": "C",
+      "key": "https://posts.example.com/authors/ada/posts/1001/",
+      "alias": "urn:uuid:ae00e6a7-7b6b-525a-a153-21df60f7166c"
+    },
+    {
+      "label": "D",
+      "key": "urn:example:post:3k2a",
+      "alias": "urn:uuid:8e25b0ff-a4da-566c-8830-e84e1a832e82"
+    },
+    {
+      "label": "E",
+      "key": "https://relay.example.com/wrapped/urn:example:post:3k2a",
+      "alias": "urn:uuid:a64c8ad8-f49b-5e63-97ae-3c9001e6ec4b"
+    },
+    {
+      "label": "F",
+      "key": "https://relay.example.com/wrapped/urn%3Aexample%3Apost%3A3k2a",
+      "alias": "urn:uuid:94729da5-a5cb-5a42-acb1-29f861593079"
+    },
+    {
+      "label": "G",
+      "key": "https://posts.example.com/notes/café",
+      "utf8Hex": "68747470733a2f2f706f7374732e6578616d706c652e636f6d2f6e6f7465732f636166c3a9",
+      "alias": "urn:uuid:73c0e4d4-8f32-59a2-b409-78d24297ade3"
+    },
+    {
+      "label": "H",
+      "key": "https://posts.example.com/notes/café",
+      "utf8Hex": "68747470733a2f2f706f7374732e6578616d706c652e636f6d2f6e6f7465732f63616665cc81",
+      "alias": "urn:uuid:d75eb778-696b-586d-ad1d-953e1229e32b"
+    },
+    {
+      "label": "I",
+      "key": "https://posts.example.com/notes/caf%C3%A9",
+      "alias": "urn:uuid:7e22e661-b12a-5a4d-a4ea-1f6331b048f9"
+    },
+    {
+      "label": "J",
+      "key": "tag:posts.example.com,2026:post-1001",
+      "alias": "urn:uuid:fe4b157f-bbcb-5a73-91bb-ed8e0df64cac"
+    }
+  ],
+  "storedIdentity": {
+    "key": "https://posts.example.com/authors/ada/posts/1001",
+    "alias": "urn:uuid:69f10a5e-8115-56eb-9d22-d7c2280512ad",
+    "richItem": {
+      "id": "urn:uuid:7bba3b0c-45df-8386-8c67-1dafda0e9042",
+      "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000030",
+      "aliases": [
+        "urn:uuid:69f10a5e-8115-56eb-9d22-d7c2280512ad"
+      ],
+      "classification": {
+        "kind": "post",
+        "retentionDays": 7
+      },
+      "capabilities": [
+        "text"
+      ],
+      "url": "https://www.example.com/author/posts/legacy",
+      "author": {
+        "name": "Example Author"
+      },
+      "text": "A post the source also knows by its legacy identity.",
+      "links": [],
+      "publishedAt": "2026-11-02T09:30:00Z"
+    },
+    "sharesIdentity": true
+  },
+  "alreadyJoined": {
+    "nativeIdentity": "https://posts.example.com/authors/ada/posts/2002",
+    "readingKey": "https://posts.example.com/authors/bea/posts/3003",
+    "alias": "urn:uuid:09cf60ba-c133-58eb-ab10-1c83994ee0cb"
+  },
+  "sharedDisplayUrl": {
+    "posts": [
+      {
+        "key": "https://posts.example.com/authors/ada/posts/4004",
+        "displayUrl": "https://www.example.com/shared/1001",
+        "alias": "urn:uuid:020728d2-7f2c-5cec-9c04-a1bb3f891a82"
+      },
+      {
+        "key": "https://posts.example.com/authors/bea/posts/5005",
+        "displayUrl": "https://www.example.com/shared/1001",
+        "alias": "urn:uuid:08c95991-a921-5529-adb4-5a760e28f360"
+      }
+    ],
+    "sharesIdentity": false
+  },
+  "refused": [
+    {
+      "utf16Hex": ""
+    },
+    {
+      "utf16Hex": "00680074007400700073003a002f002f0070006f007300740073002e006500780061006d0070006c0065002e0063006f006d002fd800"
+    }
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "contractVersion": 8,
+  "files": [
+    {
+      "name": "rich-feed-changes.json",
+      "sha256": "e91ccefb9dc18cc9fb257cbf2e88969fedd2f992429b7a8521d6fee49db92d06"
+    },
+    {
+      "name": "rich-feed-events.json",
+      "sha256": "e29cf71d6110726c4a8797b942c698599449af234f8ee7a8499531b3d19eb29e"
+    },
+    {
+      "name": "rich-feed-identity.json",
+      "sha256": "f19897a823acfdc397031ea247d7a6e9bed3e1df8c8069302c070a9e81d5ad55"
+    },
+    {
+      "name": "rich-feed-legacy-identity.json",
+      "sha256": "9c1334e82e8261efe4b2f7e29ebb857d75a512b4d0d8b77dd49402d8ad30114e"
+    },
+    {
+      "name": "rich-feed-list-oauth.json",
+      "sha256": "de8b35b29a845904aeaed0ae07a093b279ffcb8ae0b8f477ba84c479e6f5f58a"
+    },
+    {
+      "name": "rich-feed-list.json",
+      "sha256": "5263c61c0b169db02a4b37a564b407e08d7985b4ca10640dcace4f916cd2cf48"
+    },
+    {
+      "name": "rich-feed-media-grant.json",
+      "sha256": "6ca7967522bf8d498f5c2b3dd1370a451a317bc8a2a4565f3e1db8c4933d255e"
+    },
+    {
+      "name": "rich-feed-media-sources.json",
+      "sha256": "0f3dcef8ce9971a35770c89c57f1a19f6758672f86976b286db21b2535a7255f"
+    },
+    {
+      "name": "rich-feed-negotiation.json",
+      "sha256": "7a8e4d5df93ecc84460cbb9d35b309f273167920eccef88e3eb8efda91326847"
+    },
+    {
+      "name": "rich-feed-not-modified.json",
+      "sha256": "cc187b6a7f747ef54e4f766c21ca9963a92b68f9b532722a7cde0dfddd7b1682"
+    },
+    {
+      "name": "rich-feed-page-1.json",
+      "sha256": "c70dfc20473b9bc2b85cd08e2831293ba5bb7c5954fa108ec851cfd4ff2a8cdb"
+    },
+    {
+      "name": "rich-feed-page-2.json",
+      "sha256": "45f1767a89e2793cd3aad6c3939b3ce4fbbea0331073b07779d026802c404bdd"
+    },
+    {
+      "name": "rich-feed-page-attribution.json",
+      "sha256": "e74a93ebc4cc1624b4a3098ecc0f44582674e05ff1495f502ce7cdf40c05709a"
+    },
+    {
+      "name": "rich-feed-page-expired.json",
+      "sha256": "b4c82126ede4c1ed5ddfe7b7ae24ba2685e977c4866e306abb6471e96b45db73"
+    },
+    {
+      "name": "rich-feed-page-media.json",
+      "sha256": "525074308bbf9b09386e22d69b8b0367f87bf6b944accb1596c7c863f2813095"
+    },
+    {
+      "name": "rich-feed-refusals.json",
+      "sha256": "ad5486dfd636bc93ce8663f8330b79e79e479e7ed553d906242bed10cea27b6d"
+    },
+    {
+      "name": "rich-feed-since.json",
+      "sha256": "b6b55f550f7a368d1a8e1323ee3e4e61533246f5d6c17a2f79ed8b30e85b6a0e"
+    },
+    {
+      "name": "rich-feed-thread-refusals.json",
+      "sha256": "8ab376abf5adba4de2d817a352443b39def09a5cc3822176db9efed54ca4c326"
+    },
+    {
+      "name": "rich-feed-thread.json",
+      "sha256": "125aff02c3187c024fa8dbbc0f50cbd6c417c62b0b48fd355e83fc0f1ee3af97"
+    }
+  ]
+}

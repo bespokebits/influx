@@ -1,0 +1,19 @@
+# Thin caller for the org's issue-link check (bespokebits/org-workflows; the reusable
+# workflow's header documents it). Copy unchanged into .github/workflows/issue-link.yml,
+# including into the private source of a dual repo. The check fails a PR that names no
+# issue; the job also adds the Linear ID of each issue the PR names, which needs
+# pull-requests: write. Make `issue-link / issue-link` a required check.
+name: issue-link
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+permissions: {}
+
+jobs:
+  issue-link:
+    permissions:
+      pull-requests: write
+      issues: read
+    uses: bespokebits/org-workflows/.github/workflows/issue-link.yml@main

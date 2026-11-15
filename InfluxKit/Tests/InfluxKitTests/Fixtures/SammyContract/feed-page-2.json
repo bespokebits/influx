@@ -1,0 +1,21 @@
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "Movies: first scores",
+  "description": "First Metascores for new films.",
+  "feed_url": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f001",
+  "authors": [
+    {
+      "name": "Sammy"
+    }
+  ],
+  "language": "en",
+  "items": [
+    {
+      "id": "urn:uuid:0193a1b2-0000-7000-8000-00000000a001",
+      "title": "Example Film One",
+      "content_text": "Metascore 50 (mixed or average)",
+      "content_html": "<p>Metascore 50 (mixed or average)</p>",
+      "date_published": "2026-10-28T10:00:00Z"
+    }
+  ]
+}

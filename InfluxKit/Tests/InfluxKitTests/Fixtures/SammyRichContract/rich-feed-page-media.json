@@ -1,0 +1,67 @@
+{
+  "format": "sammy.rich-feed",
+  "version": 1,
+  "feed": {
+    "id": "0193a1b2-0000-7000-8000-00000000f003",
+    "title": "Authored posts",
+    "description": "Full authored posts from a configured source.",
+    "feedUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003"
+  },
+  "source": {
+    "id": "urn:uuid:14d5d292-767a-8624-adb2-42f1bd24c8ff",
+    "kind": "author",
+    "title": "Example Author",
+    "url": "https://www.example.com/author/",
+    "aliases": [
+      "urn:uuid:b12b27da-1c8d-8180-8d92-78ccd089c040"
+    ]
+  },
+  "items": [
+    {
+      "id": "urn:uuid:8120961e-90e9-8b74-988d-f460e03e1cad",
+      "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000040",
+      "aliases": [],
+      "classification": {
+        "kind": "post",
+        "retentionDays": 7
+      },
+      "capabilities": [
+        "text",
+        "media"
+      ],
+      "url": "https://www.example.com/author/posts/media",
+      "author": {
+        "name": "Example Author",
+        "url": "https://www.example.com/author/"
+      },
+      "text": "A post with a photo, a short clip and an animation. The words stand alone without them.",
+      "links": [],
+      "media": [
+        {
+          "id": "example-image-1",
+          "kind": "image",
+          "width": 1600,
+          "height": 900,
+          "alt": "A lighthouse on a rocky shore at dusk."
+        },
+        {
+          "id": "example-video-1",
+          "kind": "video",
+          "width": 1280,
+          "height": 720,
+          "alt": "Waves breaking against the lighthouse rocks.",
+          "durationMs": 15500,
+          "preview": true
+        },
+        {
+          "id": "example-gif-1",
+          "kind": "gif",
+          "width": 480,
+          "height": 480,
+          "preview": false
+        }
+      ],
+      "publishedAt": "2026-11-02T12:00:00Z"
+    }
+  ]
+}

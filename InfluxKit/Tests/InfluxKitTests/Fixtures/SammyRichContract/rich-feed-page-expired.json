@@ -1,0 +1,20 @@
+{
+  "format": "sammy.rich-feed",
+  "version": 1,
+  "feed": {
+    "id": "0193a1b2-0000-7000-8000-00000000f003",
+    "title": "Authored posts",
+    "description": "Full authored posts from a configured source.",
+    "feedUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003"
+  },
+  "source": {
+    "id": "urn:uuid:14d5d292-767a-8624-adb2-42f1bd24c8ff",
+    "kind": "author",
+    "title": "Example Author",
+    "url": "https://www.example.com/author/",
+    "aliases": [
+      "urn:uuid:b12b27da-1c8d-8180-8d92-78ccd089c040"
+    ]
+  },
+  "items": []
+}

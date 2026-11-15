@@ -1,0 +1,26 @@
+{
+  "clients": [
+    {
+      "client_id": "influx",
+      "client_name": "Influx",
+      "redirect_uris": [
+        "dev.bespokebits.influx:/oauth/sammy",
+        "dev.bespokebits.flux:/oauth/sammy"
+      ],
+      "scopes": [
+        "feeds:read",
+        "inbox:add"
+      ],
+      "token_endpoint_auth_method": "none",
+      "grant_types": [
+        "authorization_code"
+      ],
+      "response_types": [
+        "code"
+      ],
+      "code_challenge_methods": [
+        "S256"
+      ]
+    }
+  ]
+}

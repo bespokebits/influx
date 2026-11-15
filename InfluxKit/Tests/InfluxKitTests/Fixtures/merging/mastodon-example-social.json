@@ -1,0 +1,88 @@
+[
+ {
+  "id": "113400000000000002",
+  "created_at": "2026-10-24T10:05:00.000Z",
+  "in_reply_to_id": null,
+  "in_reply_to_account_id": null,
+  "spoiler_text": "",
+  "uri": "https://hachyderm.example/users/ed/statuses/77/activity",
+  "url": null,
+  "content": "",
+  "account": {
+   "id": "3301",
+   "username": "ed",
+   "acct": "ed@hachyderm.example",
+   "display_name": "Ed",
+   "url": "https://hachyderm.example/@ed"
+  },
+  "mentions": [],
+  "media_attachments": [],
+  "card": null,
+  "filtered": [],
+  "reblog": {
+   "id": "113399999000000002",
+   "created_at": "2026-10-24T09:30:00.000Z",
+   "in_reply_to_id": null,
+   "in_reply_to_account_id": null,
+   "spoiler_text": "",
+   "uri": "https://bsky.brid.gy/convert/ap/at://did:plc:cy/app.bsky.feed.post/3lcy1",
+   "url": "https://bsky.app/profile/did:plc:cy/post/3lcy1",
+   "content": "<p>Hello from Bluesky</p>",
+   "account": {
+    "id": "4401",
+    "username": "cy.bsky.social",
+    "acct": "cy.bsky.social@bsky.brid.gy",
+    "display_name": "Cy",
+    "url": "https://bsky.app/profile/cy.bsky.social"
+   },
+   "mentions": [],
+   "media_attachments": [],
+   "card": null,
+   "filtered": [],
+   "reblog": null
+  }
+ },
+ {
+  "id": "113400000000000001",
+  "created_at": "2026-10-24T10:00:00.000Z",
+  "in_reply_to_id": null,
+  "in_reply_to_account_id": null,
+  "spoiler_text": "",
+  "uri": "https://example.social/users/ana/statuses/113400000000000001/activity",
+  "url": null,
+  "content": "",
+  "account": {
+   "id": "101",
+   "username": "ana",
+   "acct": "ana",
+   "display_name": "Ana Ruiz",
+   "url": "https://example.social/@ana"
+  },
+  "mentions": [],
+  "media_attachments": [],
+  "card": null,
+  "filtered": [],
+  "reblog": {
+   "id": "113399999000000001",
+   "created_at": "2026-10-24T09:00:00.000Z",
+   "in_reply_to_id": null,
+   "in_reply_to_account_id": null,
+   "spoiler_text": "",
+   "uri": "https://other.example/users/bo/statuses/4400",
+   "url": "https://other.example/@bo/4400",
+   "content": "<p>A photo from the hills.</p>",
+   "account": {
+    "id": "2201",
+    "username": "bo",
+    "acct": "bo@other.example",
+    "display_name": "Bo Lindqvist",
+    "url": "https://other.example/@bo"
+   },
+   "mentions": [],
+   "media_attachments": [],
+   "card": null,
+   "filtered": [],
+   "reblog": null
+  }
+ }
+]

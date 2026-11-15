@@ -1,0 +1,8 @@
+{
+  "status": 200,
+  "body": {
+    "access_token": "sao_contract-example-access-token",
+    "token_type": "Bearer",
+    "scope": "feeds:read"
+  }
+}

@@ -1,0 +1,41 @@
+# Reviewed layer-1 occurrences for scripts/check-publication.py.
+#
+# One per line: path | pattern | exact matched text. The path is a tracked
+# file, never a glob or a directory; the pattern is a layer-1 name from the
+# check; the text is exactly what the pattern matched. An entry allows that
+# text, for that pattern, in that file only. Personal terms (layer 2) are
+# never allowed: reword them. Say why above each group.
+#
+# This file is scanned like any other, and other scanners read it too, so
+# write the text so no pattern matches it: put one character in brackets,
+# [c], where that breaks the match. Each dot is [.], each at sign [@] and
+# each colon [:]; for other patterns bracket a letter or digit (K[3]39). A
+# literal [ is [[].
+#
+# The pull-request scan applies main's copy of this file
+# (.github/workflows/publication.yml), so a new exception lands in a pull
+# request of its own first, then the code it covers. The check notes an
+# entry that allows nothing; remove it with the code it covered.
+
+# The public-address guard documents the ranges it refuses.
+InfluxKit/Sources/InfluxKit/Media/PublicAddress.swift | ipv6-ula | fc00[:][:]
+
+# The guard's tests: private names and addresses are the inputs it must refuse.
+InfluxKit/Tests/InfluxKitTests/MediaTests.swift | private-network-name | printer[.]local
+InfluxKit/Tests/InfluxKitTests/MediaTests.swift | private-network-name | db[.]internal
+InfluxKit/Tests/InfluxKitTests/MediaTests.swift | private-network-name | router[.]home[.]arpa
+InfluxKit/Tests/InfluxKitTests/MediaTests.swift | private-network-name | router[.]local
+InfluxKit/Tests/InfluxKitTests/MediaTests.swift | private-ipv4 | 10[.]0[.]0[.]1
+InfluxKit/Tests/InfluxKitTests/MediaTests.swift | private-ipv4 | 192[.]168[.]1[.]1
+InfluxKit/Tests/InfluxKitTests/SammyDirectMediaTests.swift | private-network-name | nas[.]local
+
+# Placeholder Mastodon handles (user@instance), not email addresses.
+InfluxKit/Sources/InfluxKit/Mastodon/MastodonOAuth.swift | email-address | me[@]mastodon[.]social
+InfluxKit/Sources/InfluxKit/Mastodon/MastodonSignIn.swift | email-address | me[@]mastodon[.]social
+InfluxKit/Tests/InfluxKitTests/MastodonTests.swift | email-address | me[@]mastodon[.]social
+InfluxTests/SignInAlertTests.swift | email-address | ana[@]mastodon[.]social
+# A fictional bridged account in a Mastodon timeline fixture.
+InfluxKit/Tests/InfluxKitTests/Fixtures/merging/mastodon-example-social.json | email-address | cy[.]bsky[.]social[@]bsky[.]brid[.]gy
+
+# The OAuth Worker refuses an audience URL with user info in it.
+server/oauth-worker/test/index.test.ts | email-address | u[@]bsky[.]social

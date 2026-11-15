@@ -1,0 +1,14 @@
+[
+  {
+    "id": "12",
+    "title": "Friends",
+    "replies_policy": "list",
+    "exclusive": false
+  },
+  {
+    "id": "13",
+    "title": "News & such",
+    "replies_policy": "followed",
+    "exclusive": true
+  }
+]

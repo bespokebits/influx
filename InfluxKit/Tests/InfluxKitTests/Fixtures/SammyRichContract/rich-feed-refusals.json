@@ -1,0 +1,72 @@
+{
+  "unauthorized": {
+    "status": 401,
+    "body": {
+      "error": "Unauthorized"
+    }
+  },
+  "forbiddenScope": {
+    "status": 403,
+    "body": {
+      "error": "Forbidden: token scope"
+    }
+  },
+  "notFound": {
+    "status": 404,
+    "body": {
+      "error": "Not found"
+    }
+  },
+  "notAcceptableRich": {
+    "status": 406,
+    "body": {
+      "error": "Not acceptable",
+      "supported": [
+        "application/vnd.sammy.rich-feed+json; version=1"
+      ]
+    }
+  },
+  "notAcceptableArticle": {
+    "status": 406,
+    "body": {
+      "error": "Not acceptable",
+      "supported": [
+        "application/feed+json"
+      ]
+    }
+  },
+  "notAcceptableList": {
+    "status": 406,
+    "body": {
+      "error": "Not acceptable",
+      "supported": [
+        "application/vnd.sammy.rich-feed+json; version=1",
+        "application/feed+json"
+      ]
+    }
+  },
+  "invalidCursor": {
+    "status": 400,
+    "body": {
+      "error": "Invalid cursor"
+    }
+  },
+  "rateLimited": {
+    "status": 429,
+    "body": {
+      "error": "Too many requests"
+    }
+  },
+  "sourceUnavailable": {
+    "status": 502,
+    "body": {
+      "error": "Feed source unavailable"
+    }
+  },
+  "notConfigured": {
+    "status": 503,
+    "body": {
+      "error": "Feeds are not configured on this server"
+    }
+  }
+}

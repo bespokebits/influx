@@ -1,0 +1,50 @@
+{
+  "format": "sammy.rich-feed-list",
+  "version": 1,
+  "account": {
+    "id": "AbCdEfGhIjKlMnOpQrStUv",
+    "server": "https://example.com"
+  },
+  "feeds": [
+    {
+      "id": "0193a1b2-0000-7000-8000-00000000f005",
+      "key": "example-articles",
+      "title": "Example article feed",
+      "description": "A fictional article feed.",
+      "feedUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f005",
+      "lastPostAt": "2026-10-30T10:07:12Z",
+      "format": "article",
+      "classification": {
+        "kind": "article",
+        "retentionDays": null
+      }
+    },
+    {
+      "id": "0193a1b2-0000-7000-8000-00000000f006",
+      "key": "example-notes",
+      "title": "Example notes feed",
+      "description": "A second fictional article feed.",
+      "feedUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f006",
+      "lastPostAt": null,
+      "format": "article",
+      "classification": {
+        "kind": "article",
+        "retentionDays": null
+      }
+    },
+    {
+      "id": "0193a1b2-0000-7000-8000-00000000f003",
+      "key": "posts",
+      "title": "Authored posts",
+      "description": "Full authored posts from a configured source.",
+      "feedUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003",
+      "lastPostAt": null,
+      "format": "rich",
+      "version": 1,
+      "classification": {
+        "kind": "post",
+        "retentionDays": 7
+      }
+    }
+  ]
+}

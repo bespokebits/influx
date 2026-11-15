@@ -1,0 +1,64 @@
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "Movies: first scores",
+  "description": "First Metascores for new films.",
+  "feed_url": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f001",
+  "authors": [
+    {
+      "name": "Sammy"
+    }
+  ],
+  "language": "en",
+  "next_url": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f001?before=eyJwIjoiMjAyNi0xMC0yOVQxMDowNTowMC4wMDBaIiwiaSI6IjAxOTNhMWIyLTAwMDAtNzAwMC04MDAwLTAwMDAwMDAwYTAwMiJ9",
+  "items": [
+    {
+      "id": "urn:uuid:0193a1b2-0000-7000-8000-00000000a003",
+      "url": "https://www.example.com/movie/example-film-three/",
+      "title": "Example Film & \"Friends\" <Three>",
+      "summary": "🟢 65 · Out Nov 12, 2026 — Critics find it warm and slight. A synthetic film for the contract.",
+      "content_text": "Metascore 65 (generally favorable)\nRelease date: November 12, 2026\n\nCritics: warm and slight.\n\nA synthetic film for the contract.\n\nMetacritic: https://www.example.com/movie/example-film-three/",
+      "content_html": "<p><img src=\"https://example.com/media/feed-images/AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbCde\" width=\"352\" height=\"528\" alt=\"\"></p><p>Metascore 65 (generally favorable)<br>Release date: November 12, 2026</p><p>Critics: warm and slight.</p><p>A synthetic film for the contract.</p><p>Metacritic: https://www.example.com/movie/example-film-three/</p><p><a href=\"https://www.example.com/movie/example-film-three/\">www.example.com</a></p>",
+      "image": "https://example.com/media/feed-images/AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbCde",
+      "date_published": "2026-10-30T10:07:12Z",
+      "tags": [
+        "movie",
+        "metascore:favorable"
+      ],
+      "_sammy": {
+        "metascore": {
+          "value": 65,
+          "max": 100,
+          "band": "favorable"
+        },
+        "release_date": "2026-11-12",
+        "kind": "movie",
+        "image_size": {
+          "width": 352,
+          "height": 528
+        }
+      }
+    },
+    {
+      "id": "urn:uuid:0193a1b2-0000-7000-8000-00000000a002",
+      "url": "https://www.example.com/movie/example-film-two/",
+      "title": "Example Film Two",
+      "summary": "🔴 31 · Out Oct 30, 2026",
+      "content_text": "🔴 31 · Out Oct 30, 2026",
+      "content_html": "<p>🔴 31 · Out Oct 30, 2026</p><p><a href=\"https://www.example.com/movie/example-film-two/\">www.example.com</a></p>",
+      "date_published": "2026-10-29T10:05:00Z",
+      "tags": [
+        "movie",
+        "metascore:unfavorable"
+      ],
+      "_sammy": {
+        "metascore": {
+          "value": 31,
+          "max": 100,
+          "band": "unfavorable"
+        },
+        "release_date": "2026-10-30",
+        "kind": "movie"
+      }
+    }
+  ]
+}

@@ -1,0 +1,211 @@
+{
+  "request": {
+    "method": "GET",
+    "endpoint": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003/threads/contract-thread-1",
+    "headers": {
+      "Accept": "application/vnd.sammy.rich-feed+json; version=1"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/vnd.sammy.rich-feed+json; version=1",
+      "Cache-Control": "private, no-cache",
+      "Vary": "Accept",
+      "ETag": "W/\"rich-thread-v1-292735d0fe809f108c3c4d545ebef1bffc885738\""
+    },
+    "body": {
+      "format": "sammy.rich-thread",
+      "version": 1,
+      "ref": "contract-thread-1",
+      "ancestors": [
+        {
+          "id": "urn:uuid:ff9fc2c1-bd8f-8072-8b83-6e5bb8150549",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000061",
+          "aliases": [],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text",
+            "media"
+          ],
+          "url": "https://www.example.com/other/posts/61",
+          "author": {
+            "name": "Another Author",
+            "url": "https://www.example.com/other/",
+            "avatar": {
+              "id": "example-avatar-2"
+            },
+            "handle": "@another_author"
+          },
+          "text": "Where is the best place to watch the lighthouse at dusk?",
+          "links": [],
+          "media": [
+            {
+              "id": "example-image-4",
+              "kind": "image",
+              "width": 1024,
+              "height": 768,
+              "alt": "A lighthouse seen from far along the coast."
+            }
+          ],
+          "publishedAt": "2026-10-25T09:00:00Z"
+        },
+        {
+          "id": "urn:uuid:21eced4d-4a4f-8fd7-8d54-eb4138924176",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000062",
+          "aliases": [],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text",
+            "links",
+            "card"
+          ],
+          "url": "https://www.example.com/other/posts/62",
+          "author": {
+            "name": "Another Author",
+            "url": "https://www.example.com/other/",
+            "avatar": {
+              "id": "example-avatar-2"
+            },
+            "handle": "@another_author"
+          },
+          "text": "Asking again now that the evenings are drawing in.",
+          "links": [
+            {
+              "url": "https://www.example.com/articles/lighthouse-hours"
+            }
+          ],
+          "card": {
+            "url": "https://www.example.com/articles/lighthouse-hours",
+            "title": "Lighthouse opening hours",
+            "site": "example.com",
+            "image": {
+              "id": "example-card-image-2",
+              "width": 800,
+              "height": 418
+            }
+          },
+          "publishedAt": "2026-11-03T07:30:00Z"
+        }
+      ],
+      "focus": {
+        "id": "urn:uuid:2eb84ebf-0321-84ee-8fba-57d7f6d121a8",
+        "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000050",
+        "aliases": [],
+        "classification": {
+          "kind": "post",
+          "retentionDays": 7
+        },
+        "capabilities": [
+          "text",
+          "thread"
+        ],
+        "url": "https://www.example.com/author/posts/50",
+        "author": {
+          "name": "Example Author",
+          "url": "https://www.example.com/author/"
+        },
+        "text": "First: the headland path, about an hour before sunset.",
+        "links": [],
+        "thread": {
+          "ref": "contract-thread-1"
+        },
+        "publishedAt": "2026-11-03T08:00:00Z"
+      },
+      "continuations": [
+        {
+          "id": "urn:uuid:e9400397-b770-8afa-81c5-1585bb665938",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000071",
+          "aliases": [],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text"
+          ],
+          "url": "https://www.example.com/author/posts/71",
+          "author": {
+            "name": "Example Author",
+            "url": "https://www.example.com/author/"
+          },
+          "text": "Second: the path is steep, so leave half an hour for it.",
+          "links": [],
+          "publishedAt": "2026-11-03T08:05:00Z"
+        },
+        {
+          "id": "urn:uuid:7d208660-1a9b-861c-84be-4fcc86095594",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000072",
+          "aliases": [],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text"
+          ],
+          "url": "https://www.example.com/author/posts/72",
+          "author": {
+            "name": "Example Author",
+            "url": "https://www.example.com/author/"
+          },
+          "text": "Third: bring a torch for the walk back down.",
+          "links": [],
+          "publishedAt": "2026-11-03T08:10:00Z"
+        }
+      ],
+      "gaps": [
+        {
+          "position": "ancestors",
+          "reason": "deleted"
+        }
+      ]
+    }
+  },
+  "notModified": {
+    "request": {
+      "headers": {
+        "Accept": "application/vnd.sammy.rich-feed+json; version=1",
+        "If-None-Match": "W/\"rich-thread-v1-292735d0fe809f108c3c4d545ebef1bffc885738\""
+      }
+    },
+    "response": {
+      "status": 304,
+      "headers": {
+        "Cache-Control": "private, no-cache",
+        "ETag": "W/\"rich-thread-v1-292735d0fe809f108c3c4d545ebef1bffc885738\"",
+        "Vary": "Accept"
+      }
+    }
+  },
+  "mediaGrant": {
+    "request": {
+      "method": "POST",
+      "endpoint": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003/media/example-image-4/grant?thread=contract-thread-1",
+      "headers": {},
+      "body": null
+    }
+  },
+  "avatarGrant": {
+    "request": {
+      "method": "POST",
+      "endpoint": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003/media/example-avatar-2/grant?thread=contract-thread-1",
+      "headers": {},
+      "body": null
+    }
+  },
+  "cardImageGrant": {
+    "request": {
+      "method": "POST",
+      "endpoint": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003/media/example-card-image-2/grant?thread=contract-thread-1",
+      "headers": {},
+      "body": null
+    }
+  }
+}

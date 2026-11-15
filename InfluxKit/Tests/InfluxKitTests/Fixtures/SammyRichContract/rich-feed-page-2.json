@@ -1,0 +1,45 @@
+{
+  "format": "sammy.rich-feed",
+  "version": 1,
+  "feed": {
+    "id": "0193a1b2-0000-7000-8000-00000000f003",
+    "title": "Authored posts",
+    "description": "Full authored posts from a configured source.",
+    "feedUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003"
+  },
+  "source": {
+    "id": "urn:uuid:14d5d292-767a-8624-adb2-42f1bd24c8ff",
+    "kind": "author",
+    "title": "Example Author",
+    "url": "https://www.example.com/author/",
+    "aliases": [
+      "urn:uuid:b12b27da-1c8d-8180-8d92-78ccd089c040"
+    ]
+  },
+  "items": [
+    {
+      "id": "urn:uuid:a679f989-2da4-87ce-b043-1ed7ae334a44",
+      "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000001",
+      "aliases": [],
+      "classification": {
+        "kind": "post",
+        "retentionDays": 7
+      },
+      "capabilities": [
+        "text"
+      ],
+      "url": "https://www.example.com/author/posts/1",
+      "author": {
+        "name": "Example Author"
+      },
+      "text": "A short post with an optional extension a reader ignores.",
+      "links": [],
+      "publishedAt": "2026-11-01T08:00:00Z",
+      "extensions": {
+        "example-extension": {
+          "note": "ignored by a reader that does not know it"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "request": {
+    "headers": {
+      "If-None-Match": "W/\"2783f7f47fdabd661f4b857f03499625bca8290b\""
+    }
+  },
+  "response": {
+    "status": 304,
+    "headers": {
+      "Cache-Control": "private, max-age=300",
+      "ETag": "W/\"2783f7f47fdabd661f4b857f03499625bca8290b\""
+    }
+  }
+}

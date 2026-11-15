@@ -1,0 +1,13 @@
+{
+  "resource": "https://example.com/mcp",
+  "authorization_servers": [
+    "https://example.com"
+  ],
+  "scopes_supported": [
+    "tasks:read",
+    "tasks:write"
+  ],
+  "bearer_methods_supported": [
+    "header"
+  ]
+}

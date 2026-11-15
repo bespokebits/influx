@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["TEAMID.dev.bespokebits.influx", "TEAMID.dev.bespokebits.influx.dev", "TEAMID.dev.bespokebits.influx.uitest", "TEAMID.dev.bespokebits.flux", "TEAMID.dev.bespokebits.flux.dev", "TEAMID.dev.bespokebits.flux.uitest"],
+        "components": [{ "/": "/oauth/callback", "comment": "Bluesky sign-in" }]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["TEAMID.dev.bespokebits.influx", "TEAMID.dev.bespokebits.influx.dev", "TEAMID.dev.bespokebits.influx.uitest", "TEAMID.dev.bespokebits.flux", "TEAMID.dev.bespokebits.flux.dev", "TEAMID.dev.bespokebits.flux.uitest"]
+  }
+}

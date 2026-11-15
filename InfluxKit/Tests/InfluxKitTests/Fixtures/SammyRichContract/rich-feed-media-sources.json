@@ -1,0 +1,199 @@
+{
+  "request": {
+    "method": "POST",
+    "endpoint": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003/media-sources",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "ids": [
+        "example-image-1",
+        "example-video-1",
+        "example-private-1",
+        "example-gone-1"
+      ]
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store"
+    },
+    "body": {
+      "media": [
+        {
+          "id": "example-image-1",
+          "use": "direct",
+          "kind": "image",
+          "expiresAt": "2026-11-03T12:15:00Z",
+          "images": [
+            {
+              "url": "https://media.example.com/img/example-image-1.jpg?size=small",
+              "width": 680,
+              "height": 383
+            },
+            {
+              "url": "https://media.example.com/img/example-image-1.jpg?size=large",
+              "width": 2048,
+              "height": 1152
+            },
+            {
+              "url": "https://media.example.com/img/example-image-1.jpg",
+              "width": 4000,
+              "height": 2250
+            }
+          ]
+        },
+        {
+          "id": "example-video-1",
+          "use": "direct",
+          "kind": "video",
+          "expiresAt": "2026-11-03T12:15:00Z",
+          "videos": [
+            {
+              "url": "https://video.example.com/vid/example-video-1/480x270.mp4",
+              "width": 480,
+              "height": 270,
+              "bitrate": 256000
+            },
+            {
+              "url": "https://video.example.com/vid/example-video-1/1280x720.mp4",
+              "width": 1280,
+              "height": 720,
+              "bitrate": 2176000
+            }
+          ],
+          "preview": [
+            {
+              "url": "https://media.example.com/thumb/example-video-1.jpg",
+              "width": 1280,
+              "height": 720
+            }
+          ]
+        },
+        {
+          "id": "example-private-1",
+          "use": "grant"
+        },
+        {
+          "id": "example-gone-1",
+          "use": "gone"
+        }
+      ]
+    }
+  },
+  "threadRequest": {
+    "method": "POST",
+    "endpoint": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003/media-sources?thread=contract-thread-1",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "ids": [
+        "example-image-1",
+        "example-video-1",
+        "example-private-1",
+        "example-gone-1"
+      ]
+    }
+  },
+  "limits": {
+    "maxIds": 50,
+    "listMax": 8,
+    "minSeconds": 60
+  },
+  "refusals": {
+    "invalidRequest": {
+      "status": 400,
+      "body": {
+        "error": "Invalid media request"
+      }
+    }
+  },
+  "upstream": {
+    "request": {
+      "method": "POST",
+      "endpoint": "https://upstream.example.com/media-sources",
+      "headers": {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "ids": [
+          "example-image-1",
+          "example-video-1",
+          "example-private-1",
+          "example-gone-1"
+        ]
+      }
+    },
+    "response": {
+      "status": 200,
+      "body": {
+        "media": [
+          {
+            "id": "example-image-1",
+            "kind": "image",
+            "publishedAt": "2026-11-03T11:30:00Z",
+            "public": true,
+            "images": [
+              {
+                "url": "https://media.example.com/img/example-image-1.jpg?size=small",
+                "width": 680,
+                "height": 383
+              },
+              {
+                "url": "https://media.example.com/img/example-image-1.jpg?size=large",
+                "width": 2048,
+                "height": 1152
+              },
+              {
+                "url": "https://media.example.com/img/example-image-1.jpg",
+                "width": 4000,
+                "height": 2250
+              }
+            ]
+          },
+          {
+            "id": "example-video-1",
+            "kind": "video",
+            "publishedAt": "2026-11-03T11:30:00Z",
+            "public": true,
+            "videos": [
+              {
+                "url": "https://video.example.com/vid/example-video-1/480x270.mp4",
+                "width": 480,
+                "height": 270,
+                "bitrate": 256000
+              },
+              {
+                "url": "https://video.example.com/vid/example-video-1/1280x720.mp4",
+                "width": 1280,
+                "height": 720,
+                "bitrate": 2176000
+              }
+            ],
+            "preview": [
+              {
+                "url": "https://media.example.com/thumb/example-video-1.jpg",
+                "width": 1280,
+                "height": 720
+              }
+            ]
+          },
+          {
+            "id": "example-private-1",
+            "kind": "image",
+            "publishedAt": "2026-11-03T11:30:00Z",
+            "public": false
+          },
+          {
+            "id": "example-gone-1",
+            "gone": true
+          }
+        ]
+      }
+    }
+  }
+}

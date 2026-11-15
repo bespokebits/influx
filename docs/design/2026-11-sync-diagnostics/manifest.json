@@ -1,0 +1,129 @@
+{
+  "slug": "influx-2026-11-sync-diagnostics",
+  "title": "Influx · Copy Diagnostics in the sync panel",
+  "intro": "Copy Diagnostics went into the sync panel with #142 without a design review. This is that review, after the fact. The button stays in the app while the review is open.\n\nDecided: sync keeps a journal on the device, and the reader can copy it (ADR 0026).\n\nOpen: whether the way to copy it belongs in the sync panel beside Sync Now, what it is called, and where it sits. Column B is one other placement, as a mock-up. A different label, or a place outside the panel, can go in the notes.\n\nHow the pictures were made: a development build has no iCloud container and so no sync button. Each picture is the app's own panel view over a sync that is never started, with made-up numbers. On the iPhone it is in the system's popover, in screenshots of the simulator; the button it hangs from and the empty paper behind it are stand-ins. On the Mac the panel is drawn alone, without the popover around it: its rounded shape, its arrow and the blur material behind it are not shown, and the flat grey is the colour of a plain window. Captured 2026-11-10 on macOS 27.2 and on the iPhone 18 Pro simulator (iOS 27.0).",
+  "columns": [
+    {
+      "key": "current",
+      "label": "Current · before the button",
+      "kind": "shipped",
+      "blurb": "The panel as it was before #142: one button, Sync Now. This is the panel's source file from commit fafd96c, the one before #142, built into the app at b616133; nothing else that draws the panel changed between the two. Captured 2026-11-10: on the iPhone simulator as a screenshot, on the Mac drawn from the app's own view. The Mac picture is the panel drawn alone in the test process; the popover's shape, arrow and blur material are not shown."
+    },
+    {
+      "key": "A",
+      "label": "A · Beside Sync Now",
+      "kind": "proposal",
+      "blurb": "As on main now (commit b616133; added in #142, fcf1a30). Copy Diagnostics sits on the same row as Sync Now, at the far edge, in the same button style. It reads Copied for two seconds after a tap. Captured 2026-11-10 from the app's code: on the iPhone simulator as a screenshot, on the Mac drawn from the app's own view. The Mac picture is the panel drawn alone in the test process; the popover's shape, arrow and blur material are not shown."
+    },
+    {
+      "key": "B",
+      "label": "B · A quiet line under a rule",
+      "kind": "proposal",
+      "blurb": "A mock-up, not in the app. Sync Now stays the panel's one button; Copy Diagnostics becomes a small line under a hairline rule. The reason: it is a troubleshooting step most readers never need, so it shouldn't weigh the same as Sync Now. Made 2026-11-10 by drawing the panel's own layout with only the last row changed, by the same capture fixture, in the app at commit b616133. The Mac picture is the panel drawn alone in the test process; the popover's shape, arrow and blur material are not shown."
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "mac-sync-panel",
+      "group": "Mac",
+      "title": "Sync panel",
+      "why": "The panel opens in a popover from the sync button in the toolbar. It had one action, Sync Now. #142 added a second one, for troubleshooting, with the same weight. These pictures show the panel's contents only, on a flat window grey: the popover's shape, arrow and blur material are not shown.",
+      "captions": {
+        "current": "One push button.",
+        "A": "Two push buttons of equal weight at either end of the row. The Copied state isn't captured on the Mac: a tap would overwrite the clipboard of the machine drawing the pictures. It is the same change of label as on the iPhone.",
+        "B": "Sync Now alone, then a rule and a small line with a copy symbol, in the secondary ink."
+      },
+      "images": [
+        {
+          "column": "current",
+          "file": "images/mac-current-light.webp",
+          "variant": "light"
+        },
+        {
+          "column": "current",
+          "file": "images/mac-current-dark.webp",
+          "variant": "dark"
+        },
+        {
+          "column": "A",
+          "file": "images/mac-A-light.webp",
+          "variant": "light"
+        },
+        {
+          "column": "A",
+          "file": "images/mac-A-dark.webp",
+          "variant": "dark"
+        },
+        {
+          "column": "B",
+          "file": "images/mac-B-light.webp",
+          "variant": "light",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "B",
+          "file": "images/mac-B-dark.webp",
+          "variant": "dark",
+          "caption": "Mock-up"
+        }
+      ]
+    },
+    {
+      "id": "ios-sync-panel",
+      "group": "iPhone",
+      "title": "Sync panel",
+      "why": "The same panel, as a popover from the sync button at the top of the timeline. Buttons here are plain tinted text, so the two actions look alike.",
+      "captions": {
+        "current": "One text button.",
+        "A": "Two text buttons in the accent colour at either end of the row. The second picture is just after a tap, reading Copied.",
+        "B": "Sync Now alone, then a rule and a small line with a copy symbol, in the secondary ink."
+      },
+      "images": [
+        {
+          "column": "current",
+          "file": "images/ios-current-light.webp",
+          "variant": "light"
+        },
+        {
+          "column": "current",
+          "file": "images/ios-current-dark.webp",
+          "variant": "dark"
+        },
+        {
+          "column": "A",
+          "file": "images/ios-A-light.webp",
+          "variant": "light"
+        },
+        {
+          "column": "A",
+          "file": "images/ios-A-light-copied.webp",
+          "variant": "light",
+          "caption": "After a tap"
+        },
+        {
+          "column": "A",
+          "file": "images/ios-A-dark.webp",
+          "variant": "dark"
+        },
+        {
+          "column": "A",
+          "file": "images/ios-A-dark-copied.webp",
+          "variant": "dark",
+          "caption": "After a tap"
+        },
+        {
+          "column": "B",
+          "file": "images/ios-B-light.webp",
+          "variant": "light",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "B",
+          "file": "images/ios-B-dark.webp",
+          "variant": "dark",
+          "caption": "Mock-up"
+        }
+      ]
+    }
+  ]
+}

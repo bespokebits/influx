@@ -1,0 +1,65 @@
+{
+  "contractVersion": 5,
+  "files": [
+    {
+      "name": "authorize-request.json",
+      "sha256": "f985b675f1ba0f29a0e3f6641b578afb4a3a85e883155ce0e09680c411ed3505"
+    },
+    {
+      "name": "callback-approved.json",
+      "sha256": "d89125514459e4d0db4805c2017d670d1d36939ac5d95c2f8d283e6ed81404f7"
+    },
+    {
+      "name": "callback-denied.json",
+      "sha256": "9d5275ebcf1f1ae74197c621b5da04411309ecaaf73cea0f7a772a8f69d39acc"
+    },
+    {
+      "name": "client-registration.json",
+      "sha256": "3794b9fa00771eb1de2d996c6d026837c02b509d59992acd786584e5f6b4a91c"
+    },
+    {
+      "name": "feed-list-oauth.json",
+      "sha256": "67bfdefdd26a463e3e9685c4de63239554ac874ca782fecdfd29882e4b6e22c3"
+    },
+    {
+      "name": "feed-list.json",
+      "sha256": "57089990feee61f0fa46b6e38462e2544089f00f6af61187873632de76c8eb99"
+    },
+    {
+      "name": "feed-not-modified.json",
+      "sha256": "c4b5b34b1855ad73a1ae84b386263227f2f778102ea6bdc467a63444c574be66"
+    },
+    {
+      "name": "feed-page-1.json",
+      "sha256": "afce2174d6bc8246f576f03c3adaae3304042524bf705ed1a6a940065d24a9df"
+    },
+    {
+      "name": "feed-page-2.json",
+      "sha256": "e994c14e4283eda2e749752081afc87302944459d638a6b838c7c1674b5ae3e4"
+    },
+    {
+      "name": "oauth-authorization-server.json",
+      "sha256": "cab48596a9d56cf6bd150f2a32a63b73c43e8b6305ffd937205621381d2be27b"
+    },
+    {
+      "name": "oauth-protected-resource.json",
+      "sha256": "7614b02dc85e44da3c19a93a31ee9fc2dfcfbd4d52ef091dde2c1ec091fab37e"
+    },
+    {
+      "name": "revoke-request.json",
+      "sha256": "bb64f9515ee5a300a43bf6a28506e4159248a90bd3d3274f0620e369c3a13d2c"
+    },
+    {
+      "name": "token-error-invalid-grant.json",
+      "sha256": "a426fd52c734ea0c2ecbf1c04df3ba26dedc3ba56f4da9107e6151d1bb6c4e79"
+    },
+    {
+      "name": "token-request.json",
+      "sha256": "2f640781c4df5b2a56387461b5abf6d8890c2f2b0287d75bfa7465bbab3168ef"
+    },
+    {
+      "name": "token-response.json",
+      "sha256": "34442e5ea9ee2b480a2e2cce0e16bba5a3ebc22a3b1ba23525cfa07559077bdd"
+    }
+  ]
+}

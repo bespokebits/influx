@@ -1,0 +1,296 @@
+{
+  "cases": [
+    {
+      "name": "same-post-two-feeds",
+      "items": [
+        {
+          "id": "urn:uuid:64e0e9dd-da6a-88b7-a819-7e9fb5202aae",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000010",
+          "aliases": [],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text"
+          ],
+          "url": "https://www.example.com/author/posts/a",
+          "author": {
+            "name": "Example Author"
+          },
+          "text": "One post in two feeds.",
+          "links": [],
+          "publishedAt": "2026-11-02T09:30:00Z"
+        },
+        {
+          "id": "urn:uuid:f7265cf1-b086-8e85-af0f-72f82e66f9ed",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000010",
+          "aliases": [],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text"
+          ],
+          "url": "https://www.example.com/author/posts/b",
+          "author": {
+            "name": "Example Author"
+          },
+          "text": "One post in two feeds.",
+          "links": [],
+          "publishedAt": "2026-11-02T09:30:00Z"
+        }
+      ],
+      "pairs": [
+        {
+          "left": 0,
+          "right": 1,
+          "sharesIdentity": true
+        }
+      ]
+    },
+    {
+      "name": "joined-through-an-alias",
+      "items": [
+        {
+          "id": "urn:uuid:64e0e9dd-da6a-88b7-a819-7e9fb5202aae",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000011",
+          "aliases": [
+            "urn:uuid:0193a1b2-0000-7000-8000-000000000012"
+          ],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text"
+          ],
+          "url": "https://www.example.com/author/posts/a",
+          "author": {
+            "name": "Example Author"
+          },
+          "text": "A post with another identity.",
+          "links": [],
+          "publishedAt": "2026-11-02T09:30:00Z"
+        },
+        {
+          "id": "urn:uuid:f7265cf1-b086-8e85-af0f-72f82e66f9ed",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000012",
+          "aliases": [],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text"
+          ],
+          "url": "https://www.example.com/author/posts/b",
+          "author": {
+            "name": "Example Author"
+          },
+          "text": "A post with another identity.",
+          "links": [],
+          "publishedAt": "2026-11-02T09:30:00Z"
+        }
+      ],
+      "pairs": [
+        {
+          "left": 0,
+          "right": 1,
+          "sharesIdentity": true
+        }
+      ]
+    },
+    {
+      "name": "distinct-posts-one-url",
+      "items": [
+        {
+          "id": "urn:uuid:28fe460b-aa7f-8cdb-a0c9-274ec58b50c9",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000013",
+          "aliases": [],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text"
+          ],
+          "url": "https://www.example.com/author/posts/shared",
+          "author": {
+            "name": "Example Author"
+          },
+          "text": "The same words.",
+          "links": [],
+          "publishedAt": "2026-11-02T09:30:00Z"
+        },
+        {
+          "id": "urn:uuid:e6a099ce-8432-8f6c-b869-9d9dbe941f9f",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000014",
+          "aliases": [],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text"
+          ],
+          "url": "https://www.example.com/author/posts/shared",
+          "author": {
+            "name": "Example Author"
+          },
+          "text": "The same words.",
+          "links": [],
+          "publishedAt": "2026-11-02T09:30:00Z"
+        }
+      ],
+      "pairs": [
+        {
+          "left": 0,
+          "right": 1,
+          "sharesIdentity": false
+        }
+      ]
+    },
+    {
+      "name": "joined-through-a-chain",
+      "items": [
+        {
+          "id": "urn:uuid:64e0e9dd-da6a-88b7-a819-7e9fb5202aae",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000015",
+          "aliases": [
+            "urn:uuid:0193a1b2-0000-7000-8000-000000000016"
+          ],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text"
+          ],
+          "url": "https://www.example.com/author/posts/a",
+          "author": {
+            "name": "Example Author"
+          },
+          "text": "One post, three identities.",
+          "links": [],
+          "publishedAt": "2026-11-02T09:30:00Z"
+        },
+        {
+          "id": "urn:uuid:f7265cf1-b086-8e85-af0f-72f82e66f9ed",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000016",
+          "aliases": [
+            "urn:uuid:0193a1b2-0000-7000-8000-000000000017"
+          ],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text"
+          ],
+          "url": "https://www.example.com/author/posts/b",
+          "author": {
+            "name": "Example Author"
+          },
+          "text": "One post, three identities.",
+          "links": [],
+          "publishedAt": "2026-11-02T09:30:00Z"
+        },
+        {
+          "id": "urn:uuid:c55293dc-1188-8667-94fa-1512f9ae6d6b",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000017",
+          "aliases": [],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text"
+          ],
+          "url": "https://www.example.com/author/posts/c",
+          "author": {
+            "name": "Example Author"
+          },
+          "text": "One post, three identities.",
+          "links": [],
+          "publishedAt": "2026-11-02T09:30:00Z"
+        }
+      ],
+      "pairs": [
+        {
+          "left": 0,
+          "right": 1,
+          "sharesIdentity": true
+        },
+        {
+          "left": 1,
+          "right": 2,
+          "sharesIdentity": true
+        },
+        {
+          "left": 0,
+          "right": 2,
+          "sharesIdentity": false
+        }
+      ]
+    },
+    {
+      "name": "either-arrival-order",
+      "items": [
+        {
+          "id": "urn:uuid:f7265cf1-b086-8e85-af0f-72f82e66f9ed",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000021",
+          "aliases": [],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text"
+          ],
+          "url": "https://www.example.com/author/posts/b",
+          "author": {
+            "name": "Example Author"
+          },
+          "text": "One post, in whichever order it arrives.",
+          "links": [],
+          "publishedAt": "2026-11-02T09:30:00Z"
+        },
+        {
+          "id": "urn:uuid:64e0e9dd-da6a-88b7-a819-7e9fb5202aae",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000020",
+          "aliases": [
+            "urn:uuid:0193a1b2-0000-7000-8000-000000000021"
+          ],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text"
+          ],
+          "url": "https://www.example.com/author/posts/a",
+          "author": {
+            "name": "Example Author"
+          },
+          "text": "One post, in whichever order it arrives.",
+          "links": [],
+          "publishedAt": "2026-11-02T09:30:00Z"
+        }
+      ],
+      "pairs": [
+        {
+          "left": 0,
+          "right": 1,
+          "sharesIdentity": true
+        },
+        {
+          "left": 1,
+          "right": 0,
+          "sharesIdentity": true
+        }
+      ]
+    }
+  ]
+}

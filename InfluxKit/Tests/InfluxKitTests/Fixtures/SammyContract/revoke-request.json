@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "endpoint": "https://example.com/oauth/revoke",
+  "contentType": "application/x-www-form-urlencoded",
+  "form": {
+    "token": "sao_contract-example-access-token",
+    "token_type_hint": "access_token",
+    "client_id": "influx"
+  },
+  "body": "token=sao_contract-example-access-token&token_type_hint=access_token&client_id=influx"
+}

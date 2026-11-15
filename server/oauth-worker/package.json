@@ -1,0 +1,15 @@
+{
+  "name": "flux-oauth-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --test test/index.test.ts test/attest.test.ts test/objects.test.ts test/perf.test.ts",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.149.0"
+  },
+  "overrides": {
+    "undici": "7.30.1"
+  }
+}

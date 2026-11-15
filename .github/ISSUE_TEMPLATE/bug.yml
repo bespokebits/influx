@@ -1,0 +1,46 @@
+name: Bug report
+description: Something in Influx doesn't work as it should.
+labels: [needs-triage]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Add the feed ...
+        2. Scroll to ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Influx version
+      description: From the version line on the Sources screen.
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options: [iOS, macOS, Both]
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and OS version
+      placeholder: iPhone 15 Pro Max, iOS 27.1
+  - type: dropdown
+    id: source
+    attributes:
+      label: Source involved
+      multiple: true
+      options: [RSS, Bluesky, Mastodon, Not specific to a source]
+  - type: markdown
+    attributes:
+      value: Please leave out account names, tokens and private feed URLs. Report security problems privately (see SECURITY.md).

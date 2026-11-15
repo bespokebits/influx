@@ -1,0 +1,127 @@
+// The CloudKit schema of Influx's iCloud container (ADR 0016, ADR 0032).
+//
+// Sync keeps everything in one custom zone of the private database. Every
+// record type has the same fields: the record's key and its payload (the
+// JSON InfluxKit encodes), both encrypted with a key from the reader's
+// iCloud Keychain. `key` and `payload` are the plain fields that records
+// had before; sync clears them on every save, so they stay in the schema.
+//
+// The record types are SyncRecordType's raw values and the field names are
+// Influx/Sync/InfluxSync.swift's `Field`; CloudKitSchemaTests checks that
+// this file matches both.
+//
+// To put it in a container's Development environment (with a CloudKit
+// management token saved by `xcrun cktool save-token --type management`):
+//   xcrun cktool import-schema --team-id <team> \
+//     --container-id iCloud.dev.bespokebits.influx \
+//     --environment development --file CloudKit/schema.ckdb
+// then deploy it to Production from CloudKit Console. Production never
+// drops a record type or field, so only ever add to this file.
+
+DEFINE SCHEMA
+
+    RECORD TYPE ArticleBookmark (
+        "___recordID" REFERENCE QUERYABLE,
+        encryptedKey ENCRYPTED STRING,
+        encryptedPayload ENCRYPTED BYTES,
+        key STRING,
+        payload BYTES,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE ArticleReadState (
+        "___recordID" REFERENCE QUERYABLE,
+        encryptedKey ENCRYPTED STRING,
+        encryptedPayload ENCRYPTED BYTES,
+        key STRING,
+        payload BYTES,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE ContentFilter (
+        "___recordID" REFERENCE QUERYABLE,
+        encryptedKey ENCRYPTED STRING,
+        encryptedPayload ENCRYPTED BYTES,
+        key STRING,
+        payload BYTES,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE LastReadMarker (
+        "___recordID" REFERENCE QUERYABLE,
+        encryptedKey ENCRYPTED STRING,
+        encryptedPayload ENCRYPTED BYTES,
+        key STRING,
+        payload BYTES,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE ReadingPlace (
+        "___recordID" REFERENCE QUERYABLE,
+        encryptedKey ENCRYPTED STRING,
+        encryptedPayload ENCRYPTED BYTES,
+        key STRING,
+        payload BYTES,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE SavedView (
+        "___recordID" REFERENCE QUERYABLE,
+        encryptedKey ENCRYPTED STRING,
+        encryptedPayload ENCRYPTED BYTES,
+        key STRING,
+        payload BYTES,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE Setting (
+        "___recordID" REFERENCE QUERYABLE,
+        encryptedKey ENCRYPTED STRING,
+        encryptedPayload ENCRYPTED BYTES,
+        key STRING,
+        payload BYTES,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE Source (
+        "___recordID" REFERENCE QUERYABLE,
+        encryptedKey ENCRYPTED STRING,
+        encryptedPayload ENCRYPTED BYTES,
+        key STRING,
+        payload BYTES,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE TimelinePosition (
+        "___recordID" REFERENCE QUERYABLE,
+        encryptedKey ENCRYPTED STRING,
+        encryptedPayload ENCRYPTED BYTES,
+        key STRING,
+        payload BYTES,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_world"
+    );
+
+    RECORD TYPE Users (
+        "___recordID" REFERENCE QUERYABLE,
+        roles LIST<INT64>,
+        GRANT WRITE TO "_creator",
+        GRANT READ TO "_world"
+    );

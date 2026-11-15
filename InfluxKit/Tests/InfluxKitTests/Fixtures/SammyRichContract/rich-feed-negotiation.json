@@ -1,0 +1,125 @@
+{
+  "cases": [
+    {
+      "accept": null,
+      "list": "article",
+      "articleFeed": "article",
+      "richFeed": "not-acceptable"
+    },
+    {
+      "accept": "*/*",
+      "list": "article",
+      "articleFeed": "article",
+      "richFeed": "not-acceptable"
+    },
+    {
+      "accept": "application/feed+json",
+      "list": "article",
+      "articleFeed": "article",
+      "richFeed": "not-acceptable"
+    },
+    {
+      "accept": "application/json",
+      "list": "article",
+      "articleFeed": "article",
+      "richFeed": "not-acceptable"
+    },
+    {
+      "accept": "application/vnd.sammy.rich-feed+json",
+      "list": "not-acceptable",
+      "articleFeed": "not-acceptable",
+      "richFeed": "not-acceptable"
+    },
+    {
+      "accept": "application/vnd.sammy.rich-feed+json; version=2",
+      "list": "not-acceptable",
+      "articleFeed": "not-acceptable",
+      "richFeed": "not-acceptable"
+    },
+    {
+      "accept": "application/vnd.sammy.rich-feed+json; version=1",
+      "list": "rich",
+      "articleFeed": "not-acceptable",
+      "richFeed": "rich"
+    },
+    {
+      "accept": "application/vnd.sammy.rich-feed+json; version=1, application/feed+json",
+      "list": "rich",
+      "articleFeed": "article",
+      "richFeed": "rich"
+    },
+    {
+      "accept": "application/vnd.sammy.rich-feed+json; version=2, application/feed+json",
+      "list": "article",
+      "articleFeed": "article",
+      "richFeed": "not-acceptable"
+    },
+    {
+      "accept": "application/vnd.sammy.rich-feed+json; version=1; q=0.5",
+      "list": "rich",
+      "articleFeed": "not-acceptable",
+      "richFeed": "rich"
+    },
+    {
+      "accept": "application/vnd.sammy.rich-feed+json; version=1; q=0.5, application/feed+json; q=1",
+      "list": "rich",
+      "articleFeed": "article",
+      "richFeed": "rich"
+    },
+    {
+      "accept": "application/vnd.sammy.rich-feed+json; version=1; q=0",
+      "list": "not-acceptable",
+      "articleFeed": "not-acceptable",
+      "richFeed": "not-acceptable"
+    },
+    {
+      "accept": "application/vnd.sammy.rich-feed+json; version=1; q=0, application/feed+json",
+      "list": "article",
+      "articleFeed": "article",
+      "richFeed": "not-acceptable"
+    },
+    {
+      "accept": "application/vnd.sammy.rich-feed+json; version=1; q=bad",
+      "list": "not-acceptable",
+      "articleFeed": "not-acceptable",
+      "richFeed": "not-acceptable"
+    },
+    {
+      "accept": "application/vnd.sammy.rich-feed+json; version=1; version=1",
+      "list": "not-acceptable",
+      "articleFeed": "not-acceptable",
+      "richFeed": "not-acceptable"
+    },
+    {
+      "accept": "application/vnd.sammy.rich-feed+json; version=1; charset=utf-8",
+      "list": "not-acceptable",
+      "articleFeed": "not-acceptable",
+      "richFeed": "not-acceptable"
+    },
+    {
+      "accept": "application/vnd.sammy.rich-feed+json; version=1;",
+      "list": "rich",
+      "articleFeed": "not-acceptable",
+      "richFeed": "rich"
+    }
+  ],
+  "responses": {
+    "page": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/vnd.sammy.rich-feed+json; version=1",
+        "Cache-Control": "private, no-cache",
+        "Vary": "Accept",
+        "ETag": "W/\"rich-v1-7529b36ea90cc14d99fec8007028d114b137ba8e\""
+      }
+    },
+    "list": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/vnd.sammy.rich-feed+json; version=1",
+        "Cache-Control": "private, no-cache",
+        "Vary": "Accept"
+      }
+    }
+  }
+}

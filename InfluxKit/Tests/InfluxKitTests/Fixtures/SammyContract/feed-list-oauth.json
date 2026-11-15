@@ -1,0 +1,24 @@
+{
+  "account": {
+    "id": "AbCdEfGhIjKlMnOpQrStUv",
+    "server": "https://example.com"
+  },
+  "feeds": [
+    {
+      "id": "0193a1b2-0000-7000-8000-00000000f001",
+      "key": "movies",
+      "title": "Movies: first scores",
+      "description": "First Metascores for new films.",
+      "feedUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f001",
+      "lastPostAt": "2026-10-30T10:07:12Z"
+    },
+    {
+      "id": "0193a1b2-0000-7000-8000-00000000f002",
+      "key": "tv",
+      "title": "New TV: first scores",
+      "description": "First Metascores for new series (season 1).",
+      "feedUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f002",
+      "lastPostAt": null
+    }
+  ]
+}

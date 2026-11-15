@@ -1,0 +1,73 @@
+{
+  "format": "sammy.rich-feed",
+  "version": 1,
+  "feed": {
+    "id": "0193a1b2-0000-7000-8000-00000000f003",
+    "title": "Authored posts",
+    "description": "Full authored posts from a configured source.",
+    "feedUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003"
+  },
+  "source": {
+    "id": "urn:uuid:14d5d292-767a-8624-adb2-42f1bd24c8ff",
+    "kind": "author",
+    "title": "Example Author",
+    "url": "https://www.example.com/author/",
+    "aliases": [
+      "urn:uuid:b12b27da-1c8d-8180-8d92-78ccd089c040"
+    ]
+  },
+  "nextUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003?before=contract-page-2",
+  "items": [
+    {
+      "id": "urn:uuid:70ad2d4e-b17f-8d6d-84e0-14a6d944d82b",
+      "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000002",
+      "aliases": [
+        "urn:uuid:0193a1b2-0000-7000-8000-000000000102"
+      ],
+      "classification": {
+        "kind": "post",
+        "retentionDays": 7
+      },
+      "capabilities": [
+        "text",
+        "links"
+      ],
+      "url": "https://www.example.com/author/posts/2",
+      "author": {
+        "name": "Example Author",
+        "url": "https://www.example.com/author/"
+      },
+      "text": "A long authored post that keeps every word past any article limit. This sentence stands in for the rest of the author's text. This sentence stands in for the rest of the author's text. This sentence stands in for the rest of the author's text. This sentence stands in for the rest of the author's text. This sentence stands in for the rest of the author's text. This sentence stands in for the rest of the author's text. This sentence stands in for the rest of the author's text. This sentence stands in for the rest of the author's text. This sentence stands in for the rest of the author's text. This sentence stands in for the rest of the author's text. This sentence stands in for the rest of the author's text. This sentence stands in for the rest of the author's text.\n\nA second paragraph, with a line break\nthat matters.\n\n<b>Not markup</b> & not escaped: plain text is plain text.",
+      "links": [
+        {
+          "url": "https://www.example.com/read/one",
+          "text": "www.example.com/read/one"
+        },
+        {
+          "url": "https://www.example.com/read/two"
+        }
+      ],
+      "publishedAt": "2026-11-02T09:30:00Z"
+    },
+    {
+      "id": "urn:uuid:6562ef86-3d74-89a3-be05-37a629ccd00c",
+      "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000003",
+      "aliases": [],
+      "classification": {
+        "kind": "post",
+        "retentionDays": 7
+      },
+      "capabilities": [
+        "text"
+      ],
+      "url": "https://www.example.com/author/posts/2",
+      "author": {
+        "name": "Example Author",
+        "url": "https://www.example.com/author/"
+      },
+      "text": "A different post with the same original URL and the same publish time.",
+      "links": [],
+      "publishedAt": "2026-11-02T09:30:00Z"
+    }
+  ]
+}

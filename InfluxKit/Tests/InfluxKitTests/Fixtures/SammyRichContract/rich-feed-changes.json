@@ -1,0 +1,72 @@
+{
+  "requests": {
+    "first": {
+      "method": "GET",
+      "url": "https://upstream.example.com/changes",
+      "headers": {
+        "accept": "application/json"
+      }
+    },
+    "next": {
+      "method": "GET",
+      "url": "https://upstream.example.com/changes?after=c-000041&wait=25",
+      "headers": {
+        "accept": "application/json"
+      }
+    }
+  },
+  "waitSeconds": 25,
+  "timeoutSeconds": 35,
+  "maxBytes": 4096,
+  "cursorPattern": "^[A-Za-z0-9_-]{1,128}$",
+  "answers": {
+    "first": {
+      "cursor": "c-000041",
+      "changed": false
+    },
+    "unchanged": {
+      "cursor": "c-000041",
+      "changed": false
+    },
+    "changed": {
+      "cursor": "c-000042",
+      "changed": true
+    }
+  },
+  "refused": [
+    {
+      "cursor": "c-000042"
+    },
+    {
+      "cursor": "c-000042",
+      "changed": "yes"
+    },
+    {
+      "cursor": "",
+      "changed": true
+    },
+    {
+      "cursor": "c/000042",
+      "changed": true
+    },
+    {
+      "cursor": "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "changed": true
+    },
+    {
+      "cursor": "c-000042",
+      "changed": true,
+      "posts": 3
+    }
+  ],
+  "backoffMilliseconds": [
+    1000,
+    2000,
+    4000,
+    8000,
+    16000,
+    32000,
+    60000,
+    60000
+  ]
+}

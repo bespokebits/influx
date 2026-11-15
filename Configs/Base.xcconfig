@@ -1,0 +1,9 @@
+// Every configuration's base settings.
+#include "DevelopmentTeam.xcconfig"
+
+// The commit a build was made from, shown in the app's version line
+// (Info.plist InfluxCommit). Empty for builds from Xcode; a build script
+// can write Configs/BuildCommit.local.xcconfig (gitignored) to set it, and
+// this include is skipped when that is absent.
+INFLUX_COMMIT =
+#include? "BuildCommit.local.xcconfig"

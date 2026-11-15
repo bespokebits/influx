@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Where the jobs run depends on the repository's visibility, because this file
+# is published with the source. In a private repository they run on the
+# organization's managed runner (ubicloud-standard-2, Ubuntu 24.04, paid by the
+# minute). In a public repository they run on GitHub-hosted Ubuntu 24.04, which
+# is free there and keeps outside pull requests off a paid runner. The Swift
+# job keeps its pinned multi-architecture image (scripts/swift-linux-test.sh).
+jobs:
+  template-check:
+    name: template-check
+    runs-on: ${{ github.event.repository.private && 'ubicloud-standard-2' || 'ubuntu-24.04' }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Required and forbidden files
+        # The public copy of the repository leaves the rules check out; only
+        # there may it be absent. Anywhere else a missing check fails.
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [ -x scripts/check-template.sh ]; then
+            scripts/check-template.sh
+          elif [ "$REPOSITORY" = bespokebits/influx ]; then
+            echo "No repository-rules check in the public copy; skipping."
+          else
+            echo "scripts/check-template.sh is missing" >&2
+            exit 1
+          fi
+      # The publication check's own tests run the pull request's code, so they
+      # run here, with no secrets, and not in publication.yml, which runs only
+      # main's checker over the pull request as data.
+      - name: The publication check's tests
+        run: python3 scripts/test_check_publication.py
+
+  swift-linux:
+    name: swift-linux
+    runs-on: ${{ github.event.repository.private && 'ubicloud-standard-2' || 'ubuntu-24.04' }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and test InfluxKit on Linux (Swift 6.4)
+        env:
+          PACKAGE_DIR: InfluxKit
+          # GRDB builds against the system SQLite headers.
+          APT_PACKAGES: libsqlite3-dev
+        run: scripts/swift-linux-test.sh
+
+  # Package pins: every Package.resolved copy matches, every Package.swift
+  # requirement is met, and every pin a change adds is at least 14 days old
+  # (scripts/check-swift-pins.py explains each rule). The token is the
+  # read-only default; it only authenticates GitHub's public release API.
+  swift-pins:
+    name: swift-pins
+    runs-on: ${{ github.event.repository.private && 'ubicloud-standard-2' || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Two commits, so only the pins changed since HEAD^1 are aged.
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Swift pins agree, meet Package.swift and are at least 14 days old
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/check-swift-pins.py --base HEAD^1 --package InfluxKit --copy Package.resolved
+
+  # The flux.bespokebits.dev Worker's tests: Node's built-in runner, no
+  # packages (server/oauth-worker/README.md).
+  oauth-worker:
+    name: oauth-worker
+    runs-on: ${{ github.event.repository.private && 'ubicloud-standard-2' || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+      - name: Test the Worker
+        working-directory: server/oauth-worker
+        run: npm test

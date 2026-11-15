@@ -1,0 +1,54 @@
+{
+  "unauthorized": {
+    "status": 401,
+    "body": {
+      "error": "Unauthorized"
+    },
+    "when": "A missing, invalid, expired or revoked credential."
+  },
+  "forbiddenScope": {
+    "status": 403,
+    "body": {
+      "error": "Forbidden: token scope"
+    },
+    "when": "A token without an explicit feeds:read."
+  },
+  "notFound": {
+    "status": 404,
+    "body": {
+      "error": "Not found"
+    },
+    "when": "An unknown, another account's, a deleted or an article feed; rich feeds off for the account; a malformed ref; a thread the upstream does not have; or a thread whose post a page would not serve now."
+  },
+  "notAcceptable": {
+    "status": 406,
+    "body": {
+      "error": "Not acceptable",
+      "supported": [
+        "application/vnd.sammy.rich-feed+json; version=1"
+      ]
+    },
+    "when": "The owner sent anything but the rich Accept."
+  },
+  "rateLimited": {
+    "status": 429,
+    "body": {
+      "error": "Too many requests"
+    },
+    "when": "Past the feed read limit it shares with pages and grants."
+  },
+  "sourceUnavailable": {
+    "status": 502,
+    "body": {
+      "error": "Feed source unavailable"
+    },
+    "when": "The upstream failed, redirected, timed out or sent an invalid thread."
+  },
+  "notConfigured": {
+    "status": 503,
+    "body": {
+      "error": "Feeds are not configured on this server"
+    },
+    "when": "The server has no public origin."
+  }
+}

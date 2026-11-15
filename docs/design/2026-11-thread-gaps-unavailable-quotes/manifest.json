@@ -1,0 +1,613 @@
+{
+  "slug": "influx-thread-gaps-unavailable-quotes",
+  "title": "Influx · Missing posts in threads and unavailable quotes",
+  "intro": "Two things the reader can't see today. A thread can come back with posts missing from it, and the thread view shows it as if it were whole. A post can quote a post that is gone or that the source can't show, and the row shows nothing where the quote would be, so its text can read oddly. Both came up with rich posts (ADR 0031), but neither is specific to one service: any service that reports a missing post or an unavailable quote would use the same treatment.\n\nDecided: both must exist. A thread with a gap says so, for each reason the service gives (deleted by its author; private, blocked or unreachable; not collected), among the earlier posts and among the later ones. A quote of an unavailable post says the quoted post is unavailable and offers its address. In the timeline, the unavailable quote's box has a fixed height, set by the text size alone, so a row's height is still final before it is shown and the row is still drawn into one bitmap.\n\nOpen: which treatment, for each surface. A, B and C go from lightest to heaviest and use the same idea on both surfaces: A is a quiet line of text, B a hairline frame, C a washed note. They can be mixed (say, B for quotes and C for gaps), and wording can go in the notes.\n\nA gap doesn't say where in its list it falls, or how many posts it stands for, so every option puts it at the edge of its list: above the first earlier post, below the last later one, and the words say \"some posts\", never a count.\n\nThe thread view shows no quote card at all today, for any quote. Every option for the thread adds the timeline's quote card there, in the thread's own type sizes, so the unavailable quote has something to match.\n\nHow the pictures were made, 2026-11-13, from the app at 521082c, with made-up posts on example.com addresses: \"Current\" is the app's own code. Timeline rows are the bitmaps the timeline's cells show, drawn by the app's row renderer and stacked; the toolbar and sidebar are not in them. The thread is the app's own thread view, fed the made-up thread through the stand-in connector sample runs use. The options are mock-ups made by the same capture fixture: a row is the app's own bitmap with room made for the new box, drawn in the row's fonts and colours; a thread is a copy of the thread view's layout with the new parts added. On the iPhone the thread is in a page sheet, as the timeline opens it; on the Mac the sheet's title bar and Done button belong to the window and are not drawn. The fixture thread is a rich-feed thread, whose posts have no like or boost buttons; the timeline rows are Mastodon-style posts, which do.",
+  "columns": [
+    {
+      "key": "current",
+      "label": "Current",
+      "kind": "shipped",
+      "blurb": "What ships at 521082c, captured 2026-11-13 from the app's own code: the timeline's row renderer and the thread view, with made-up posts. On the iPhone it was drawn on the iPhone 18 Pro simulator (iOS 27); on the Mac it was drawn in the test process on macOS 27 (cacheDisplay), without the sheet's title bar. A gap is never drawn, and an unavailable quote leaves nothing."
+    },
+    {
+      "key": "A",
+      "label": "A · A quiet line",
+      "kind": "proposal",
+      "blurb": "Mock-up, made 2026-11-13 by the capture fixture over the app at 521082c. The lightest: a single line of secondary-ink text, no box. A gap is an italic sentence with an ellipsis, between the thread's rules. An unavailable quote is one line under the text, \"Quoted post unavailable · example.com\", the site underlined and tappable."
+    },
+    {
+      "key": "B",
+      "label": "B · A hairline frame",
+      "kind": "proposal",
+      "blurb": "Mock-up, made 2026-11-13 by the capture fixture over the app at 521082c. The shape of what is missing: a gap is a dashed hairline frame where a post would be, one per reason, with a symbol, a short title and a line of detail. An unavailable quote keeps the quote card's hairline box, holding \"The quoted post is unavailable.\" in italic and the site."
+    },
+    {
+      "key": "C",
+      "label": "C · A washed note",
+      "kind": "proposal",
+      "blurb": "Mock-up, made 2026-11-13 by the capture fixture over the app at 521082c. The most visible: a note on the wash colour the link cards use. A gap's note has a small heading, a sentence per reason and a link to the whole thread on its own site. An unavailable quote is a washed slip with a symbol, \"Quoted post unavailable\" and the address itself."
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "ios-thread-gaps",
+      "group": "iPhone",
+      "title": "Thread: missing posts",
+      "why": "The thread view (Open Thread) shows the posts a post answers above it and the author's continuations below. When the service says some of them are missing, nothing shows it, so the thread reads as complete. Each picture is one thread on the iPhone: two earlier posts, the opened post on its wash, and two continuations, with the service reporting gaps as named in each caption.",
+      "captions": {
+        "current": "The thread as if whole. The service said posts were missing, and nothing says so.",
+        "A": "One italic line per reason, at the top of the earlier posts and the foot of the later ones. Lightest, and easy to miss.",
+        "B": "A dashed frame per reason, sitting where a post would: symbol, \"Earlier posts deleted\", \"Removed by their authors.\" It can read as exactly one post in that spot, which the service doesn't say.",
+        "C": "A washed note at the edge of the list: \"EARLIER POSTS MISSING\", a sentence per reason, and \"Read the whole thread on example.com\", which opens the post's own page."
+      },
+      "images": [
+        {
+          "column": "current",
+          "file": "images/ios-gaps-current-deleted-light.webp",
+          "variant": "light",
+          "caption": "The same for every reason: no gap is drawn"
+        },
+        {
+          "column": "current",
+          "file": "images/ios-gaps-current-deleted-dark.webp",
+          "variant": "dark",
+          "caption": "The same for every reason: no gap is drawn"
+        },
+        {
+          "column": "A",
+          "file": "images/ios-gaps-A-deleted-light.webp",
+          "variant": "light",
+          "caption": "Deleted, earlier and later"
+        },
+        {
+          "column": "A",
+          "file": "images/ios-gaps-A-unavailable-light.webp",
+          "variant": "light",
+          "caption": "Unavailable, earlier and later"
+        },
+        {
+          "column": "A",
+          "file": "images/ios-gaps-A-not-collected-light.webp",
+          "variant": "light",
+          "caption": "Not collected, earlier and later"
+        },
+        {
+          "column": "A",
+          "file": "images/ios-gaps-A-two-reasons-light.webp",
+          "variant": "light",
+          "caption": "Two reasons among the earlier posts"
+        },
+        {
+          "column": "A",
+          "file": "images/ios-gaps-A-deleted-dark.webp",
+          "variant": "dark",
+          "caption": "Deleted, earlier and later"
+        },
+        {
+          "column": "A",
+          "file": "images/ios-gaps-A-unavailable-dark.webp",
+          "variant": "dark",
+          "caption": "Unavailable, earlier and later"
+        },
+        {
+          "column": "A",
+          "file": "images/ios-gaps-A-not-collected-dark.webp",
+          "variant": "dark",
+          "caption": "Not collected, earlier and later"
+        },
+        {
+          "column": "A",
+          "file": "images/ios-gaps-A-two-reasons-dark.webp",
+          "variant": "dark",
+          "caption": "Two reasons among the earlier posts"
+        },
+        {
+          "column": "B",
+          "file": "images/ios-gaps-B-deleted-light.webp",
+          "variant": "light",
+          "caption": "Deleted, earlier and later"
+        },
+        {
+          "column": "B",
+          "file": "images/ios-gaps-B-unavailable-light.webp",
+          "variant": "light",
+          "caption": "Unavailable, earlier and later"
+        },
+        {
+          "column": "B",
+          "file": "images/ios-gaps-B-not-collected-light.webp",
+          "variant": "light",
+          "caption": "Not collected, earlier and later"
+        },
+        {
+          "column": "B",
+          "file": "images/ios-gaps-B-two-reasons-light.webp",
+          "variant": "light",
+          "caption": "Two reasons among the earlier posts"
+        },
+        {
+          "column": "B",
+          "file": "images/ios-gaps-B-deleted-dark.webp",
+          "variant": "dark",
+          "caption": "Deleted, earlier and later"
+        },
+        {
+          "column": "B",
+          "file": "images/ios-gaps-B-unavailable-dark.webp",
+          "variant": "dark",
+          "caption": "Unavailable, earlier and later"
+        },
+        {
+          "column": "B",
+          "file": "images/ios-gaps-B-not-collected-dark.webp",
+          "variant": "dark",
+          "caption": "Not collected, earlier and later"
+        },
+        {
+          "column": "B",
+          "file": "images/ios-gaps-B-two-reasons-dark.webp",
+          "variant": "dark",
+          "caption": "Two reasons among the earlier posts"
+        },
+        {
+          "column": "C",
+          "file": "images/ios-gaps-C-deleted-light.webp",
+          "variant": "light",
+          "caption": "Deleted, earlier and later"
+        },
+        {
+          "column": "C",
+          "file": "images/ios-gaps-C-unavailable-light.webp",
+          "variant": "light",
+          "caption": "Unavailable, earlier and later"
+        },
+        {
+          "column": "C",
+          "file": "images/ios-gaps-C-not-collected-light.webp",
+          "variant": "light",
+          "caption": "Not collected, earlier and later"
+        },
+        {
+          "column": "C",
+          "file": "images/ios-gaps-C-two-reasons-light.webp",
+          "variant": "light",
+          "caption": "Two reasons among the earlier posts"
+        },
+        {
+          "column": "C",
+          "file": "images/ios-gaps-C-deleted-dark.webp",
+          "variant": "dark",
+          "caption": "Deleted, earlier and later"
+        },
+        {
+          "column": "C",
+          "file": "images/ios-gaps-C-unavailable-dark.webp",
+          "variant": "dark",
+          "caption": "Unavailable, earlier and later"
+        },
+        {
+          "column": "C",
+          "file": "images/ios-gaps-C-not-collected-dark.webp",
+          "variant": "dark",
+          "caption": "Not collected, earlier and later"
+        },
+        {
+          "column": "C",
+          "file": "images/ios-gaps-C-two-reasons-dark.webp",
+          "variant": "dark",
+          "caption": "Two reasons among the earlier posts"
+        }
+      ]
+    },
+    {
+      "id": "ios-row-unavailable-quote",
+      "group": "iPhone",
+      "title": "Timeline: unavailable quote",
+      "why": "Two timeline rows on the iPhone: a post quoting a post that is still there (the quote card), and below it a post quoting one that is gone. The app stores the second without a quote, so the row shows nothing, and its \"the one I quoted\" points at nothing. The box must have a fixed height, since a row's height is final before it is shown.",
+      "captions": {
+        "current": "The top row has its quote card. The bottom row quotes a post that is gone and shows nothing.",
+        "A": "One line of secondary ink where the card would be. Height: one meta line.",
+        "B": "The quote card's hairline box, with an italic line and the site. Height: padding, one line of the quote text's size, one meta line.",
+        "C": "A washed slip, like a small link card: symbol, \"Quoted post unavailable\" and the address, cut in the middle if long. Height: padding and two meta lines."
+      },
+      "images": [
+        {
+          "column": "current",
+          "file": "images/ios-row-current-light.webp",
+          "variant": "light"
+        },
+        {
+          "column": "current",
+          "file": "images/ios-row-current-dark.webp",
+          "variant": "dark"
+        },
+        {
+          "column": "A",
+          "file": "images/ios-row-A-light.webp",
+          "variant": "light",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "A",
+          "file": "images/ios-row-A-dark.webp",
+          "variant": "dark",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "B",
+          "file": "images/ios-row-B-light.webp",
+          "variant": "light",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "B",
+          "file": "images/ios-row-B-dark.webp",
+          "variant": "dark",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "C",
+          "file": "images/ios-row-C-light.webp",
+          "variant": "light",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "C",
+          "file": "images/ios-row-C-dark.webp",
+          "variant": "dark",
+          "caption": "Mock-up"
+        }
+      ]
+    },
+    {
+      "id": "ios-thread-unavailable-quote",
+      "group": "iPhone",
+      "title": "Thread: unavailable quote",
+      "why": "The same posts in the thread view on the iPhone. The thread view draws no quote card at all today, so neither quote shows, the one that is there or the one that is gone. Every option adds the quote card to the thread (on the earlier post) as well as the unavailable treatment (on the opened post).",
+      "captions": {
+        "current": "No quote card on either post: the thread view doesn't draw quotes.",
+        "A": "The quote card on the earlier post; one quiet line on the opened post.",
+        "B": "The quote card on the earlier post; the same hairline box, saying the post is unavailable, on the opened post.",
+        "C": "The quote card on the earlier post; a washed slip with the address on the opened post."
+      },
+      "images": [
+        {
+          "column": "current",
+          "file": "images/ios-thread-quote-current-light.webp",
+          "variant": "light"
+        },
+        {
+          "column": "current",
+          "file": "images/ios-thread-quote-current-dark.webp",
+          "variant": "dark"
+        },
+        {
+          "column": "A",
+          "file": "images/ios-thread-quote-A-light.webp",
+          "variant": "light",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "A",
+          "file": "images/ios-thread-quote-A-dark.webp",
+          "variant": "dark",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "B",
+          "file": "images/ios-thread-quote-B-light.webp",
+          "variant": "light",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "B",
+          "file": "images/ios-thread-quote-B-dark.webp",
+          "variant": "dark",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "C",
+          "file": "images/ios-thread-quote-C-light.webp",
+          "variant": "light",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "C",
+          "file": "images/ios-thread-quote-C-dark.webp",
+          "variant": "dark",
+          "caption": "Mock-up"
+        }
+      ]
+    },
+    {
+      "id": "mac-thread-gaps",
+      "group": "Mac",
+      "title": "Thread: missing posts",
+      "why": "The thread view (Open Thread) shows the posts a post answers above it and the author's continuations below. When the service says some of them are missing, nothing shows it, so the thread reads as complete. Each picture is one thread on the Mac: two earlier posts, the opened post on its wash, and two continuations, with the service reporting gaps as named in each caption.",
+      "captions": {
+        "current": "The thread as if whole. The service said posts were missing, and nothing says so.",
+        "A": "One italic line per reason, at the top of the earlier posts and the foot of the later ones. Lightest, and easy to miss.",
+        "B": "A dashed frame per reason, sitting where a post would: symbol, \"Earlier posts deleted\", \"Removed by their authors.\" It can read as exactly one post in that spot, which the service doesn't say.",
+        "C": "A washed note at the edge of the list: \"EARLIER POSTS MISSING\", a sentence per reason, and \"Read the whole thread on example.com\", which opens the post's own page."
+      },
+      "images": [
+        {
+          "column": "current",
+          "file": "images/mac-gaps-current-deleted-light.webp",
+          "variant": "light",
+          "caption": "The same for every reason: no gap is drawn"
+        },
+        {
+          "column": "current",
+          "file": "images/mac-gaps-current-deleted-dark.webp",
+          "variant": "dark",
+          "caption": "The same for every reason: no gap is drawn"
+        },
+        {
+          "column": "A",
+          "file": "images/mac-gaps-A-deleted-light.webp",
+          "variant": "light",
+          "caption": "Deleted, earlier and later"
+        },
+        {
+          "column": "A",
+          "file": "images/mac-gaps-A-unavailable-light.webp",
+          "variant": "light",
+          "caption": "Unavailable, earlier and later"
+        },
+        {
+          "column": "A",
+          "file": "images/mac-gaps-A-not-collected-light.webp",
+          "variant": "light",
+          "caption": "Not collected, earlier and later"
+        },
+        {
+          "column": "A",
+          "file": "images/mac-gaps-A-two-reasons-light.webp",
+          "variant": "light",
+          "caption": "Two reasons among the earlier posts"
+        },
+        {
+          "column": "A",
+          "file": "images/mac-gaps-A-deleted-dark.webp",
+          "variant": "dark",
+          "caption": "Deleted, earlier and later"
+        },
+        {
+          "column": "A",
+          "file": "images/mac-gaps-A-unavailable-dark.webp",
+          "variant": "dark",
+          "caption": "Unavailable, earlier and later"
+        },
+        {
+          "column": "A",
+          "file": "images/mac-gaps-A-not-collected-dark.webp",
+          "variant": "dark",
+          "caption": "Not collected, earlier and later"
+        },
+        {
+          "column": "A",
+          "file": "images/mac-gaps-A-two-reasons-dark.webp",
+          "variant": "dark",
+          "caption": "Two reasons among the earlier posts"
+        },
+        {
+          "column": "B",
+          "file": "images/mac-gaps-B-deleted-light.webp",
+          "variant": "light",
+          "caption": "Deleted, earlier and later"
+        },
+        {
+          "column": "B",
+          "file": "images/mac-gaps-B-unavailable-light.webp",
+          "variant": "light",
+          "caption": "Unavailable, earlier and later"
+        },
+        {
+          "column": "B",
+          "file": "images/mac-gaps-B-not-collected-light.webp",
+          "variant": "light",
+          "caption": "Not collected, earlier and later"
+        },
+        {
+          "column": "B",
+          "file": "images/mac-gaps-B-two-reasons-light.webp",
+          "variant": "light",
+          "caption": "Two reasons among the earlier posts"
+        },
+        {
+          "column": "B",
+          "file": "images/mac-gaps-B-deleted-dark.webp",
+          "variant": "dark",
+          "caption": "Deleted, earlier and later"
+        },
+        {
+          "column": "B",
+          "file": "images/mac-gaps-B-unavailable-dark.webp",
+          "variant": "dark",
+          "caption": "Unavailable, earlier and later"
+        },
+        {
+          "column": "B",
+          "file": "images/mac-gaps-B-not-collected-dark.webp",
+          "variant": "dark",
+          "caption": "Not collected, earlier and later"
+        },
+        {
+          "column": "B",
+          "file": "images/mac-gaps-B-two-reasons-dark.webp",
+          "variant": "dark",
+          "caption": "Two reasons among the earlier posts"
+        },
+        {
+          "column": "C",
+          "file": "images/mac-gaps-C-deleted-light.webp",
+          "variant": "light",
+          "caption": "Deleted, earlier and later"
+        },
+        {
+          "column": "C",
+          "file": "images/mac-gaps-C-unavailable-light.webp",
+          "variant": "light",
+          "caption": "Unavailable, earlier and later"
+        },
+        {
+          "column": "C",
+          "file": "images/mac-gaps-C-not-collected-light.webp",
+          "variant": "light",
+          "caption": "Not collected, earlier and later"
+        },
+        {
+          "column": "C",
+          "file": "images/mac-gaps-C-two-reasons-light.webp",
+          "variant": "light",
+          "caption": "Two reasons among the earlier posts"
+        },
+        {
+          "column": "C",
+          "file": "images/mac-gaps-C-deleted-dark.webp",
+          "variant": "dark",
+          "caption": "Deleted, earlier and later"
+        },
+        {
+          "column": "C",
+          "file": "images/mac-gaps-C-unavailable-dark.webp",
+          "variant": "dark",
+          "caption": "Unavailable, earlier and later"
+        },
+        {
+          "column": "C",
+          "file": "images/mac-gaps-C-not-collected-dark.webp",
+          "variant": "dark",
+          "caption": "Not collected, earlier and later"
+        },
+        {
+          "column": "C",
+          "file": "images/mac-gaps-C-two-reasons-dark.webp",
+          "variant": "dark",
+          "caption": "Two reasons among the earlier posts"
+        }
+      ]
+    },
+    {
+      "id": "mac-row-unavailable-quote",
+      "group": "Mac",
+      "title": "Timeline: unavailable quote",
+      "why": "Two timeline rows on the Mac: a post quoting a post that is still there (the quote card), and below it a post quoting one that is gone. The app stores the second without a quote, so the row shows nothing, and its \"the one I quoted\" points at nothing. The box must have a fixed height, since a row's height is final before it is shown.",
+      "captions": {
+        "current": "The top row has its quote card. The bottom row quotes a post that is gone and shows nothing.",
+        "A": "One line of secondary ink where the card would be. Height: one meta line.",
+        "B": "The quote card's hairline box, with an italic line and the site. Height: padding, one line of the quote text's size, one meta line.",
+        "C": "A washed slip, like a small link card: symbol, \"Quoted post unavailable\" and the address, cut in the middle if long. Height: padding and two meta lines."
+      },
+      "images": [
+        {
+          "column": "current",
+          "file": "images/mac-row-current-light.webp",
+          "variant": "light"
+        },
+        {
+          "column": "current",
+          "file": "images/mac-row-current-dark.webp",
+          "variant": "dark"
+        },
+        {
+          "column": "A",
+          "file": "images/mac-row-A-light.webp",
+          "variant": "light",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "A",
+          "file": "images/mac-row-A-dark.webp",
+          "variant": "dark",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "B",
+          "file": "images/mac-row-B-light.webp",
+          "variant": "light",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "B",
+          "file": "images/mac-row-B-dark.webp",
+          "variant": "dark",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "C",
+          "file": "images/mac-row-C-light.webp",
+          "variant": "light",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "C",
+          "file": "images/mac-row-C-dark.webp",
+          "variant": "dark",
+          "caption": "Mock-up"
+        }
+      ]
+    },
+    {
+      "id": "mac-thread-unavailable-quote",
+      "group": "Mac",
+      "title": "Thread: unavailable quote",
+      "why": "The same posts in the thread view on the Mac. The thread view draws no quote card at all today, so neither quote shows, the one that is there or the one that is gone. Every option adds the quote card to the thread (on the earlier post) as well as the unavailable treatment (on the opened post).",
+      "captions": {
+        "current": "No quote card on either post: the thread view doesn't draw quotes.",
+        "A": "The quote card on the earlier post; one quiet line on the opened post.",
+        "B": "The quote card on the earlier post; the same hairline box, saying the post is unavailable, on the opened post.",
+        "C": "The quote card on the earlier post; a washed slip with the address on the opened post."
+      },
+      "images": [
+        {
+          "column": "current",
+          "file": "images/mac-thread-quote-current-light.webp",
+          "variant": "light"
+        },
+        {
+          "column": "current",
+          "file": "images/mac-thread-quote-current-dark.webp",
+          "variant": "dark"
+        },
+        {
+          "column": "A",
+          "file": "images/mac-thread-quote-A-light.webp",
+          "variant": "light",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "A",
+          "file": "images/mac-thread-quote-A-dark.webp",
+          "variant": "dark",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "B",
+          "file": "images/mac-thread-quote-B-light.webp",
+          "variant": "light",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "B",
+          "file": "images/mac-thread-quote-B-dark.webp",
+          "variant": "dark",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "C",
+          "file": "images/mac-thread-quote-C-light.webp",
+          "variant": "light",
+          "caption": "Mock-up"
+        },
+        {
+          "column": "C",
+          "file": "images/mac-thread-quote-C-dark.webp",
+          "variant": "dark",
+          "caption": "Mock-up"
+        }
+      ]
+    }
+  ]
+}

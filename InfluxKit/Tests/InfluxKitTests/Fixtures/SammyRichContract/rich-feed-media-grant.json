@@ -1,0 +1,99 @@
+{
+  "grant": {
+    "request": {
+      "method": "POST",
+      "endpoint": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003/media/example-video-1/grant",
+      "headers": {},
+      "body": null
+    },
+    "response": {
+      "status": 200,
+      "headers": {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store"
+      },
+      "body": {
+        "url": "https://example.com/api/v1/rich-media/contract-example-media-grant",
+        "expiresAt": "2026-11-03T12:15:00Z"
+      }
+    },
+    "lifetimeSeconds": {
+      "default": 900,
+      "min": 60,
+      "max": 3600
+    }
+  },
+  "bytes": {
+    "methods": [
+      "GET",
+      "HEAD"
+    ],
+    "urls": {
+      "original": "https://example.com/api/v1/rich-media/contract-example-media-grant",
+      "preview": "https://example.com/api/v1/rich-media/contract-example-media-grant?variant=preview"
+    },
+    "pathPrefix": "/api/v1/rich-media/",
+    "contentTypes": [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "video/mp4"
+    ],
+    "range": {
+      "request": {
+        "headers": {
+          "Range": "bytes=0-1023"
+        }
+      },
+      "response": {
+        "status": 206,
+        "headers": {
+          "Content-Type": "video/mp4",
+          "Content-Length": "1024",
+          "Accept-Ranges": "bytes",
+          "Content-Range": "bytes 0-1023/4096",
+          "Cache-Control": "private, max-age=900"
+        }
+      }
+    }
+  },
+  "refusals": {
+    "notFound": {
+      "status": 404,
+      "body": {
+        "error": "Not found"
+      }
+    },
+    "expired": {
+      "status": 410,
+      "body": {
+        "error": "Media grant expired"
+      }
+    },
+    "invalidRequest": {
+      "status": 400,
+      "body": {
+        "error": "Invalid media request"
+      }
+    },
+    "tooManyStreams": {
+      "status": 429,
+      "body": {
+        "error": "Too many requests"
+      }
+    },
+    "rangeNotSatisfiable": {
+      "status": 416,
+      "body": {
+        "error": "Range not satisfiable"
+      }
+    },
+    "sourceUnavailable": {
+      "status": 502,
+      "body": {
+        "error": "Feed source unavailable"
+      }
+    }
+  }
+}

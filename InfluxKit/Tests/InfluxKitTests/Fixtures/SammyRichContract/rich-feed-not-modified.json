@@ -1,0 +1,16 @@
+{
+  "request": {
+    "headers": {
+      "Accept": "application/vnd.sammy.rich-feed+json; version=1",
+      "If-None-Match": "W/\"rich-v1-7529b36ea90cc14d99fec8007028d114b137ba8e\""
+    }
+  },
+  "response": {
+    "status": 304,
+    "headers": {
+      "Cache-Control": "private, no-cache",
+      "ETag": "W/\"rich-v1-7529b36ea90cc14d99fec8007028d114b137ba8e\"",
+      "Vary": "Accept"
+    }
+  }
+}

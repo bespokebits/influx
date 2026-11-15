@@ -1,0 +1,96 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/feeds/events",
+    "headers": {
+      "Accept": "text/event-stream"
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-store"
+    }
+  },
+  "frames": {
+    "reconnect": "retry: 5000\n\n",
+    "ready": "event: ready\ndata: {}\n\n",
+    "changed": "event: feed.changed\ndata: {\"feedId\":\"0193a1b2-0000-7000-8000-00000000f003\"}\n\n",
+    "keepalive": ": keepalive\n\n"
+  },
+  "stream": "retry: 5000\n\nevent: ready\ndata: {}\n\nevent: feed.changed\ndata: {\"feedId\":\"0193a1b2-0000-7000-8000-00000000f003\"}\n\nevent: feed.changed\ndata: {\"feedId\":\"0193a1b2-0000-7000-8000-00000000f005\"}\n\n: keepalive\n\n",
+  "events": [
+    {
+      "event": "ready",
+      "data": {}
+    },
+    {
+      "event": "feed.changed",
+      "data": {
+        "feedId": "0193a1b2-0000-7000-8000-00000000f003"
+      }
+    },
+    {
+      "event": "feed.changed",
+      "data": {
+        "feedId": "0193a1b2-0000-7000-8000-00000000f005"
+      }
+    }
+  ],
+  "limits": {
+    "streamsPerAccount": 4,
+    "keepaliveSeconds": 25,
+    "recheckSeconds": 60,
+    "maxAgeSeconds": 3600,
+    "retryMilliseconds": 5000
+  },
+  "refusals": {
+    "unauthorized": {
+      "status": 401,
+      "body": {
+        "error": "Unauthorized"
+      },
+      "when": "A missing, invalid, expired or revoked credential."
+    },
+    "forbiddenScope": {
+      "status": 403,
+      "body": {
+        "error": "Forbidden: token scope"
+      },
+      "when": "A token without an explicit feeds:read."
+    },
+    "notFound": {
+      "status": 404,
+      "body": {
+        "error": "Not found"
+      },
+      "when": "Feeds are switched off on this server."
+    },
+    "rateLimited": {
+      "status": 429,
+      "body": {
+        "error": "Too many requests"
+      },
+      "when": "Past the feed read limit it shares with pages, threads and grants; with Retry-After."
+    },
+    "tooManyStreams": {
+      "status": 429,
+      "body": {
+        "error": "Too many requests"
+      },
+      "when": "The account already has this many streams open.",
+      "headers": {
+        "Cache-Control": "no-store",
+        "Retry-After": "5"
+      }
+    },
+    "notConfigured": {
+      "status": 503,
+      "body": {
+        "error": "Feeds are not configured on this server"
+      },
+      "when": "The server has no public origin."
+    }
+  }
+}

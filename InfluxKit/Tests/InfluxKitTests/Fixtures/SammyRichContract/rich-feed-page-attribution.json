@@ -1,0 +1,187 @@
+{
+  "format": "sammy.rich-feed",
+  "version": 1,
+  "feed": {
+    "id": "0193a1b2-0000-7000-8000-00000000f003",
+    "title": "Authored posts",
+    "description": "Full authored posts from a configured source.",
+    "feedUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003"
+  },
+  "source": {
+    "id": "urn:uuid:14d5d292-767a-8624-adb2-42f1bd24c8ff",
+    "kind": "author",
+    "title": "Example Author",
+    "url": "https://www.example.com/author/",
+    "aliases": [
+      "urn:uuid:b12b27da-1c8d-8180-8d92-78ccd089c040"
+    ]
+  },
+  "items": [
+    {
+      "id": "urn:uuid:2eb84ebf-0321-84ee-8fba-57d7f6d121a8",
+      "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000050",
+      "aliases": [],
+      "classification": {
+        "kind": "post",
+        "retentionDays": 7
+      },
+      "capabilities": [
+        "text",
+        "thread"
+      ],
+      "url": "https://www.example.com/author/posts/50",
+      "author": {
+        "name": "Example Author",
+        "url": "https://www.example.com/author/"
+      },
+      "text": "First: the headland path, about an hour before sunset.",
+      "links": [],
+      "thread": {
+        "ref": "contract-thread-1"
+      },
+      "publishedAt": "2026-11-03T08:00:00Z"
+    },
+    {
+      "id": "urn:uuid:73727e07-0a03-853d-8758-79fd836fc7cb",
+      "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000051",
+      "aliases": [],
+      "classification": {
+        "kind": "post",
+        "retentionDays": 7
+      },
+      "capabilities": [
+        "text",
+        "repost"
+      ],
+      "url": "https://www.example.com/other/posts/51",
+      "author": {
+        "name": "Another Author",
+        "url": "https://www.example.com/other/",
+        "avatar": {
+          "id": "example-avatar-2"
+        },
+        "handle": "@another_author"
+      },
+      "repostedBy": {
+        "name": "Example Author",
+        "url": "https://www.example.com/author/",
+        "avatar": {
+          "id": "example-avatar-1"
+        }
+      },
+      "text": "A post by another author, shown here because the feed's author reposted it.",
+      "links": [],
+      "publishedAt": "2026-11-02T15:00:00Z"
+    },
+    {
+      "id": "urn:uuid:79be70d6-136d-81ed-84f3-ca7bc8d08bcb",
+      "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000052",
+      "aliases": [],
+      "classification": {
+        "kind": "post",
+        "retentionDays": 7
+      },
+      "capabilities": [
+        "text",
+        "quote"
+      ],
+      "url": "https://www.example.com/author/posts/52",
+      "author": {
+        "name": "Example Author",
+        "url": "https://www.example.com/author/"
+      },
+      "text": "Quoting this because the photo says it better than I can.",
+      "links": [],
+      "quote": {
+        "url": "https://www.example.com/other/posts/53",
+        "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000053",
+        "author": {
+          "name": "Another Author",
+          "url": "https://www.example.com/other/",
+          "avatar": {
+            "id": "example-avatar-2"
+          },
+          "handle": "@another_author"
+        },
+        "text": "The harbour at first light.",
+        "media": [
+          {
+            "id": "example-image-3",
+            "kind": "image",
+            "width": 1200,
+            "height": 800,
+            "alt": "Fishing boats moored in a calm harbour."
+          }
+        ],
+        "publishedAt": "2026-10-20T06:00:00Z"
+      },
+      "publishedAt": "2026-11-02T14:00:00Z"
+    },
+    {
+      "id": "urn:uuid:318f901e-02bc-8c66-b4d1-cbacaad06f3f",
+      "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000054",
+      "aliases": [],
+      "classification": {
+        "kind": "post",
+        "retentionDays": 7
+      },
+      "capabilities": [
+        "text",
+        "quote"
+      ],
+      "url": "https://www.example.com/author/posts/54",
+      "author": {
+        "name": "Example Author",
+        "url": "https://www.example.com/author/"
+      },
+      "text": "Quoting a post the source can no longer show.",
+      "links": [],
+      "quote": {
+        "url": "https://www.example.com/other/posts/55",
+        "unavailable": true
+      },
+      "publishedAt": "2026-11-02T13:00:00Z"
+    },
+    {
+      "id": "urn:uuid:955125f4-90e3-846a-9776-4216dd92efd4",
+      "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000056",
+      "aliases": [],
+      "classification": {
+        "kind": "post",
+        "retentionDays": 7
+      },
+      "capabilities": [
+        "text",
+        "links",
+        "card"
+      ],
+      "url": "https://www.example.com/other/posts/56",
+      "author": {
+        "name": "Another Author",
+        "url": "https://www.example.com/other/",
+        "avatar": {
+          "id": "example-avatar-2"
+        },
+        "handle": "@another_author"
+      },
+      "text": "Worth a read before the weekend's walk.",
+      "links": [
+        {
+          "url": "https://www.example.com/articles/coast-path?utm_source=example"
+        }
+      ],
+      "card": {
+        "url": "https://www.example.com/articles/coast-path?utm_source=example",
+        "title": "Walking the coast path in winter",
+        "description": "What to pack, where to start and how long each stretch takes.",
+        "site": "example.com",
+        "image": {
+          "id": "example-card-image-1",
+          "width": 1200,
+          "height": 628
+        }
+      },
+      "publishedAt": "2026-11-02T12:30:00Z"
+    }
+  ]
+}

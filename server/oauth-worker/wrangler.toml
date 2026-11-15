@@ -1,0 +1,78 @@
+# flux.bespokebits.dev and influx.bespokebits.dev: Influx's OAuth files and
+# client-assertion signer, one client per host with the same key.
+# See README.md.
+name = "flux-oauth"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+# Exactly the hosts in HOSTS (src/index.ts); the Worker refuses any other.
+routes = [
+  { pattern = "flux.bespokebits.dev", custom_domain = true },
+  { pattern = "influx.bespokebits.dev", custom_domain = true },
+]
+
+[assets]
+directory = "public"
+binding = "ASSETS"
+# Every request reaches the Worker first, so it can refuse unknown hosts and
+# answer the client metadata for the host asked.
+run_worker_first = true
+
+[vars]
+# The current signing key's ID, set when the key is made. The private key
+# itself is the SIGNING_KEY_JWK secret.
+SIGNING_KID = "bN5nseMPifArqi70hZ6GF0tTM-yGsZnKirp6rLqwfvE"
+# The issuers it signs for, separated by spaces: bsky.social's entryway, which
+# is the issuer for every account hosted by Bluesky. Add self-hosted PDSes'
+# issuers here as needed, until App Attest makes the list unnecessary.
+ALLOWED_ISSUERS = "https://bsky.social"
+# The Apple team whose App IDs (<team>.<bundle ID>) attested keys must name.
+APPLE_TEAM_ID = "KV99MN4F58"
+# "true" refuses assertion requests without App Attest headers (ADR 0033,
+# phase 2, since 2026-11-14). "false" would check attestation whenever it is
+# sent and sign either way; it is the fast way back if real installs fail.
+REQUIRE_ATTESTATION = "true"
+# The lowest app bundle version (CFBundleVersion, dotted numbers) it
+# attests, in registrations and assertions. A malformed value refuses every
+# attested request, so check it when raising it.
+MIN_BUNDLE_VERSION = "0.1.0"
+# Assertions signed per UTC day, across all callers. Influx asks once per PAR,
+# token exchange and refresh. Can rise once callers are attested.
+DAILY_LIMIT = "2000"
+
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 30, period = 60 }
+
+[[durable_objects.bindings]]
+name = "DAILY_COUNT"
+class_name = "DailyCount"
+
+# Outstanding registration challenges, one object for the Worker.
+[[durable_objects.bindings]]
+name = "CHALLENGES"
+class_name = "Challenges"
+
+# One object per attested key, named by its key ID, so its counter advances
+# one request at a time.
+[[durable_objects.bindings]]
+name = "ATTESTED_KEYS"
+class_name = "AttestedKey"
+
+# Field performance reports from attested TestFlight installs (ADR 0034),
+# one object for the Worker, one record per UTC day.
+[[durable_objects.bindings]]
+name = "PERF_REPORTS"
+class_name = "PerfReports"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DailyCount"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Challenges", "AttestedKey"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["PerfReports"]

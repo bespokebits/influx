@@ -1,0 +1,9 @@
+// Apple Developer team used for signing. This is the project default and is
+// what Xcode Cloud builds with.
+DEVELOPMENT_TEAM = KV99MN4F58
+
+// Per-developer override. Create Configs/DevelopmentTeam.local.xcconfig with
+// your own `DEVELOPMENT_TEAM = <team id>`; the file is gitignored, and this
+// include is skipped when it is absent. It stays last because the final
+// assignment wins.
+#include? "DevelopmentTeam.local.xcconfig"

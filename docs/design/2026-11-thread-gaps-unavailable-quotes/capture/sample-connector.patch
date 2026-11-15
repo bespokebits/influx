@@ -1,0 +1,18 @@
+diff --git a/Influx/Shared/SampleConnector.swift b/Influx/Shared/SampleConnector.swift
+index b0dc48e..6dca819 100644
+--- a/Influx/Shared/SampleConnector.swift
++++ b/Influx/Shared/SampleConnector.swift
+@@ -24,8 +24,13 @@ struct SampleConnector: Connector {
+ 
+     func offersThread(of item: ItemReference) -> Bool { true }
+ 
++    /// Capture runs only (docs/design/2026-11-thread-gaps-unavailable-quotes):
++    /// the thread every post opens instead of the made-up one below.
++    nonisolated(unsafe) static var captureThread: PostThread?
++
+     /// The post with one post above it and a few replies, made up.
+     func thread(of reference: ItemReference) async throws -> PostThread {
++        if let thread = Self.captureThread { return thread }
+         try await Task.sleep(for: .milliseconds(300))
+         func post(_ id: String, _ author: String, _ body: String) -> Item {
+             Item(sourceID: reference.sourceID, remoteID: id, kind: .post, mergeKey: "sample:\(id)",

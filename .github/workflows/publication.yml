@@ -1,0 +1,94 @@
+name: publication
+
+# Nothing private in what would be published: the tree, commit messages, and
+# a pull request's title and body (a squash merge writes those into main).
+# scripts/check-publication.py does the scan.
+#
+# Why it is shaped this way. The personal term list (the secret
+# INFLUX_PUBLICATION_TERMS, layer 2) must never reach code that a pull request
+# can change, and a pull request must not be able to loosen its own check.
+# - pull_request_target, not pull_request: GitHub runs this file as it is on
+#   the default branch, so a pull request cannot edit the workflow that
+#   checks it.
+# - The checker and its allowlist come from a checkout of the default branch
+#   (base/), never the pull request's head. The pull request is checked out
+#   on its own (pr/) as data: nothing in pr/ is run, imported or sourced; only
+#   base/'s checker and git read it. So a pull request's edits to the checker
+#   or the allowlist take effect only after it merges, and a new reviewed
+#   exception lands in a pull request of its own first.
+# - The secret goes only to the scan step, and only for a pull request from
+#   this repository. A fork gets none (it could otherwise learn the terms by
+#   trial): it runs layer 1, and the log says so in one line.
+# - Least permissions: contents: read, and neither checkout keeps the token.
+# - The checker's own tests run the pull request's code, so they run in
+#   ci.yml (template-check), on pull_request, with no secrets.
+# A push to main, or a manual run, scans that commit with its own code.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: publication-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
+
+# Runner choice as in ci.yml: the managed runner in a private repository,
+# GitHub-hosted Ubuntu in a public one.
+jobs:
+  publication:
+    name: publication
+    runs-on: ${{ github.event.repository.private && 'ubicloud-standard-2' || 'ubuntu-24.04' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: The checker, from the default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.repository.default_branch || github.sha }}
+          path: base
+          # A push's range, for its commit messages.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: The pull request, as data only
+        if: github.event_name == 'pull_request_target'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/head
+          path: pr
+          # Every branch as well, so the base commit is there for the range.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Nothing private in what would be published
+        env:
+          # Layer 2, one term per line, when the repository has the secret:
+          # never for a fork's pull request. Output never prints a term.
+          INFLUX_PUBLICATION_TERMS: ${{ (github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository) && secrets.INFLUX_PUBLICATION_TERMS || '' }}
+          EVENT: ${{ github.event_name }}
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # -I: no environment variables or working-directory imports.
+          check=(python3 -I base/scripts/check-publication.py)
+          if [ "$EVENT" = pull_request_target ]; then
+            check+=(--root pr --allowlist base/scripts/publication-allowlist.txt)
+            if [ "$SAME_REPO" != true ]; then
+              check+=(--layer1-only "a fork's pull request gets no secrets")
+            fi
+            "${check[@]}" --messages "$BASE_SHA..HEAD" \
+              --pr-title="$PR_TITLE" --pr-body="$PR_BODY"
+          elif [ "$EVENT" = push ] && [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            # The pushed commits' messages too (the squash merge's own).
+            "${check[@]}" --root base --messages "$BEFORE..$AFTER"
+          else
+            "${check[@]}" --root base
+          fi

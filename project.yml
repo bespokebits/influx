@@ -1,0 +1,510 @@
+name: Influx
+options:
+  deploymentTarget:
+    iOS: "27.0"
+    macOS: "27.0"
+  createIntermediateGroups: true
+
+configs:
+  Debug: debug
+  Test: debug
+  Release: release
+  Perf: release
+
+# DEVELOPMENT_TEAM lives in Configs/DevelopmentTeam.xcconfig so a collaborator
+# can override it locally (Configs/DevelopmentTeam.local.xcconfig, gitignored).
+# Configs/Base.xcconfig includes it and sets INFLUX_COMMIT (the version line).
+configFiles:
+  Debug: Configs/Base.xcconfig
+  Test: Configs/Base.xcconfig
+  Release: Configs/Base.xcconfig
+  Perf: Configs/Base.xcconfig
+
+# Each configuration has its own bundle ID, so a dev or UI-test build never
+# shares data, keychain items or iCloud containers with the production app.
+#
+# The app was dev.bespokebits.flux until the rename (ADR 0032). Its sign-ins
+# sit in the old app's keychain group, so the builds that had them list that
+# group after their own (INFLUX_LEGACY_KEYCHAIN_GROUP, in keychain-access-
+# groups). Test and Perf had no sign-ins worth keeping, and the Mac Test and
+# Perf builds sign with the team's wildcard profile, which can't carry the
+# entitlement, so they list none.
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    # One version for the app and every framework in it: App Store Connect
+    # refuses a build with a framework that has no CFBundleShortVersionString
+    # (error 90057), and a framework's generated Info.plist has one only when
+    # its target has MARKETING_VERSION. Xcode Cloud sets the build number.
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+  configs:
+    Debug:
+      INFLUX_BUNDLE_IDENTIFIER: dev.bespokebits.influx.dev
+      INFLUX_PRODUCT_NAME: "Influx Dev"
+      INFLUX_DISPLAY_NAME: "Influx Dev"
+      INFLUX_CLOUDKIT_CONTAINER: ""
+      INFLUX_IOS_ENTITLEMENTS: ""
+      INFLUX_MAC_ENTITLEMENTS: ""
+      INFLUX_MAC_CLOUDKIT_LDFLAGS: ""
+      INFLUX_LEGACY_KEYCHAIN_GROUP: dev.bespokebits.flux.dev
+      # App Attest (ADR 0033), in the iOS Influx and Influx.icloud
+      # entitlements. Debug attests in Apple's development environment,
+      # which the signing service accepts only for this bundle ID; Release in
+      # production. macOS has no such entitlement, and every Mac build
+      # attests in production, a development-signed one too. Test and Perf
+      # never sign in for real and carry none.
+      INFLUX_APP_ATTEST_ENVIRONMENT: development
+    Test:
+      INFLUX_BUNDLE_IDENTIFIER: dev.bespokebits.influx.uitest
+      INFLUX_PRODUCT_NAME: "Influx Test"
+      INFLUX_DISPLAY_NAME: "Influx Test"
+      INFLUX_CLOUDKIT_CONTAINER: ""
+      INFLUX_IOS_ENTITLEMENTS: .test
+      # The Mac Test build signs with the team's wildcard profile, which
+      # can't carry Associated Domains, so it leaves them out. Tests never
+      # sign in for real.
+      INFLUX_MAC_ENTITLEMENTS: .test
+      INFLUX_MAC_CLOUDKIT_LDFLAGS: ""
+      INFLUX_LEGACY_KEYCHAIN_GROUP: ""
+    Release:
+      INFLUX_BUNDLE_IDENTIFIER: dev.bespokebits.influx
+      INFLUX_PRODUCT_NAME: Influx
+      INFLUX_DISPLAY_NAME: Influx
+      # iCloud sync. Release is the one build that syncs. Debug and Test
+      # sign without the iCloud entitlement, so a dev or UI-test run never
+      # touches the reader's iCloud data. Sync is off wherever INFLUX_CLOUDKIT_CONTAINER
+      # is empty.
+      #
+      # The .icloud entitlements list $(INFLUX_CLOUDKIT_CONTAINER), so one
+      # override on the xcodebuild command line points both the entitlement
+      # and Info.plist at another container. The one-time bridge from the
+      # old app's container (ADR 0032) was a development-signed Release build
+      # with INFLUX_CLOUDKIT_CONTAINER=iCloud.dev.bespokebits.flux.dev and
+      # INFLUX_CLOUDKIT_ENVIRONMENT=Development; the committed defaults never
+      # change for it.
+      INFLUX_CLOUDKIT_CONTAINER: iCloud.dev.bespokebits.influx
+      # Every Release build syncs with Production, as TestFlight's does,
+      # even one signed for development. Otherwise a development-signed
+      # build uses the Development database, but with sync state saved for
+      # Production, which the store does not tell apart.
+      INFLUX_CLOUDKIT_ENVIRONMENT: Production
+      INFLUX_IOS_ENTITLEMENTS: .icloud
+      INFLUX_MAC_ENTITLEMENTS: .icloud
+      # The Mac app links CloudKit at launch where it syncs: the sandbox
+      # allows reaching CloudKit's daemon only for frameworks loaded at
+      # launch, so a CloudKit loaded later with InfluxSync can't sync. iOS
+      # has no such rule and keeps CloudKit out of launch.
+      INFLUX_MAC_CLOUDKIT_LDFLAGS: -framework CloudKit
+      INFLUX_LEGACY_KEYCHAIN_GROUP: dev.bespokebits.flux
+      INFLUX_APP_ATTEST_ENVIRONMENT: production
+    # Release's optimisation under its own bundle ID, for the performance
+    # run on the phone (scripts/iphone-perf.sh). Hitch numbers need a
+    # release build, but installing Release would replace the reader's own
+    # app, relaunch it with sample data and move its reading place. Perf
+    # installs beside it and never syncs, like Debug and Test.
+    Perf:
+      INFLUX_BUNDLE_IDENTIFIER: dev.bespokebits.influx.perf
+      INFLUX_PRODUCT_NAME: "Influx Perf"
+      INFLUX_DISPLAY_NAME: "Influx Perf"
+      INFLUX_CLOUDKIT_CONTAINER: ""
+      INFLUX_IOS_ENTITLEMENTS: .test
+      INFLUX_MAC_ENTITLEMENTS: .test
+      INFLUX_MAC_CLOUDKIT_LDFLAGS: ""
+      INFLUX_LEGACY_KEYCHAIN_GROUP: ""
+
+packages:
+  InfluxKit:
+    path: InfluxKit
+
+targets:
+  # iOS and macOS are separate native targets over one shared SwiftUI shell.
+  # Both use the same bundle ID: one App Store Connect record, one iCloud
+  # container. The timeline itself is UIKit on iOS and AppKit on macOS.
+  Influx-iOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: Influx/Shared
+      - path: Influx/iOS
+    dependencies:
+      - package: InfluxKit
+      # Embedded, not linked: WebSignIn loads it on the first sign-in, so
+      # AuthenticationServices stays out of launch.
+      - target: InfluxWebSignIn-iOS
+        link: false
+        embed: true
+      # Likewise for video: loaded on the first tap on a video, so AVKit
+      # and AVFoundation stay out of launch.
+      - target: InfluxVideo-iOS
+        link: false
+        embed: true
+      # Likewise for sync: loaded after the first screen, so CloudKit stays
+      # out of launch.
+      - target: InfluxSync-iOS
+        link: false
+        embed: true
+      # Likewise for field performance reports: loaded after the first
+      # screen, so MetricKit and StoreKit stay out of launch.
+      - target: InfluxMetrics-iOS
+        link: false
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(INFLUX_BUNDLE_IDENTIFIER)
+        # The file name (Influx.app, Influx Dev.app, Influx Test.app). Users
+        # see INFLUX_DISPLAY_NAME (CFBundleDisplayName and CFBundleName below).
+        PRODUCT_NAME: $(INFLUX_PRODUCT_NAME)
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        PRODUCT_MODULE_NAME: Influx
+        TARGETED_DEVICE_FAMILY: "1"
+        CODE_SIGN_STYLE: Automatic
+        # Associated Domains, for the Bluesky sign-in universal link, the
+        # keychain groups in Debug and Release, and iCloud in Release (see
+        # INFLUX_IOS_ENTITLEMENTS above).
+        CODE_SIGN_ENTITLEMENTS: Influx/iOS/Influx$(INFLUX_IOS_ENTITLEMENTS).entitlements
+        ENABLE_TESTABILITY: YES
+    info:
+      path: Influx/iOS/Info.plist
+      properties:
+        CFBundleDisplayName: $(INFLUX_DISPLAY_NAME)
+        CFBundleName: $(INFLUX_DISPLAY_NAME)
+        # Without these XcodeGen writes 1.0 (1), not the target's versions.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # The commit, from Configs/Base.xcconfig (BuildInfo).
+        InfluxCommit: $(INFLUX_COMMIT)
+        # The iCloud container sync uses, empty where sync is off.
+        InfluxCloudKitContainer: $(INFLUX_CLOUDKIT_CONTAINER)
+        # The link back to an item (ItemLink): dev.bespokebits.influx://item?ref=…
+        # Each build registers its own bundle ID, so only the App Store build
+        # takes dev.bespokebits.influx and a dev build never takes its links.
+        # The sign-in callbacks on that scheme go to the sign-in sheet, which
+        # needs no registration.
+        CFBundleURLTypes:
+          - CFBundleURLName: $(INFLUX_BUNDLE_IDENTIFIER)
+            CFBundleURLSchemes:
+              - $(INFLUX_BUNDLE_IDENTIFIER)
+        UILaunchScreen: {}
+        # iCloud's pushes tell sync when another device changed something
+        #; harmless in builds without iCloud, which never register.
+        UIBackgroundModes:
+          - remote-notification
+        # Without this, iPhone caps CADisplayLink and scrolling at 60 Hz.
+        CADisableMinimumFrameDurationOnPhone: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        ITSAppUsesNonExemptEncryption: false
+        # OPML has no system type, so without this the file picker shows
+        # .opml files with a generic icon. Same identifier as other readers.
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: org.opml.opml
+            UTTypeDescription: OPML Subscription List
+            UTTypeConformsTo:
+              - public.xml
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - opml
+              public.mime-type:
+                - text/x-opml
+
+  Influx-macOS:
+    type: application
+    platform: macOS
+    sources:
+      - path: Influx/Shared
+      - path: Influx/macOS
+    dependencies:
+      - package: InfluxKit
+      # Embedded, not linked: WebSignIn loads it on the first sign-in, so
+      # AuthenticationServices stays out of launch.
+      - target: InfluxWebSignIn-macOS
+        link: false
+        embed: true
+      # Likewise for video: loaded on the first tap on a video, so AVKit
+      # and AVFoundation stay out of launch.
+      - target: InfluxVideo-macOS
+        link: false
+        embed: true
+      # Likewise for sync, loaded after the first screen; but on the Mac,
+      # Release links CloudKit itself (see INFLUX_MAC_CLOUDKIT_LDFLAGS).
+      - target: InfluxSync-macOS
+        link: false
+        embed: true
+      # Likewise for field performance reports: loaded after the first
+      # screen, so MetricKit and StoreKit stay out of launch.
+      - target: InfluxMetrics-macOS
+        link: false
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(INFLUX_BUNDLE_IDENTIFIER)
+        # The file name (Influx.app, Influx Dev.app, Influx Test.app). Users
+        # see INFLUX_DISPLAY_NAME (CFBundleDisplayName and CFBundleName below).
+        PRODUCT_NAME: $(INFLUX_PRODUCT_NAME)
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        PRODUCT_MODULE_NAME: Influx
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: Influx/macOS/Influx$(INFLUX_MAC_ENTITLEMENTS).entitlements
+        OTHER_LDFLAGS: $(inherited) $(INFLUX_MAC_CLOUDKIT_LDFLAGS)
+        ENABLE_HARDENED_RUNTIME: YES
+        ENABLE_TESTABILITY: YES
+    info:
+      path: Influx/macOS/Info.plist
+      properties:
+        CFBundleDisplayName: $(INFLUX_DISPLAY_NAME)
+        CFBundleName: $(INFLUX_DISPLAY_NAME)
+        # Without these XcodeGen writes 1.0 (1), not the target's versions.
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # The commit, from Configs/Base.xcconfig (BuildInfo).
+        InfluxCommit: $(INFLUX_COMMIT)
+        # The iCloud container sync uses, empty where sync is off.
+        InfluxCloudKitContainer: $(INFLUX_CLOUDKIT_CONTAINER)
+        # The link back to an item; see the iOS target.
+        CFBundleURLTypes:
+          - CFBundleURLName: $(INFLUX_BUNDLE_IDENTIFIER)
+            CFBundleURLSchemes:
+              - $(INFLUX_BUNDLE_IDENTIFIER)
+        LSMinimumSystemVersion: "27.0"
+        # Required for Mac App Store Connect validation.
+        LSApplicationCategoryType: public.app-category.news
+        ITSAppUsesNonExemptEncryption: false
+        # OPML has no system type, so without this the file picker shows
+        # .opml files with a generic icon. Same identifier as other readers.
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: org.opml.opml
+            UTTypeDescription: OPML Subscription List
+            UTTypeConformsTo:
+              - public.xml
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - opml
+              public.mime-type:
+                - text/x-opml
+
+  # The web sign-in sheet (Influx/WebSignIn), kept out of the app binary so
+  # its AuthenticationServices link doesn't load at launch.
+  InfluxWebSignIn-iOS:
+    type: framework
+    platform: iOS
+    sources:
+      - path: Influx/WebSignIn
+    settings:
+      base:
+        PRODUCT_NAME: InfluxWebSignIn
+        PRODUCT_MODULE_NAME: InfluxWebSignIn
+        PRODUCT_BUNDLE_IDENTIFIER: $(INFLUX_BUNDLE_IDENTIFIER).websignin
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
+
+  # The web sign-in sheet (Influx/WebSignIn), kept out of the app binary so
+  # its AuthenticationServices link doesn't load at launch.
+  InfluxWebSignIn-macOS:
+    type: framework
+    platform: macOS
+    sources:
+      - path: Influx/WebSignIn
+    settings:
+      base:
+        PRODUCT_NAME: InfluxWebSignIn
+        PRODUCT_MODULE_NAME: InfluxWebSignIn
+        PRODUCT_BUNDLE_IDENTIFIER: $(INFLUX_BUNDLE_IDENTIFIER).websignin
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
+
+  # Video playback (Influx/Video), kept out of the app binary so AVKit and
+  # AVFoundation don't load at launch.
+  InfluxVideo-iOS:
+    type: framework
+    platform: iOS
+    sources:
+      - path: Influx/Video
+    settings:
+      base:
+        PRODUCT_NAME: InfluxVideo
+        PRODUCT_MODULE_NAME: InfluxVideo
+        PRODUCT_BUNDLE_IDENTIFIER: $(INFLUX_BUNDLE_IDENTIFIER).video
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
+
+  # Video playback (Influx/Video), kept out of the app binary so AVKit and
+  # AVFoundation don't load at launch.
+  InfluxVideo-macOS:
+    type: framework
+    platform: macOS
+    sources:
+      - path: Influx/Video
+    settings:
+      base:
+        PRODUCT_NAME: InfluxVideo
+        PRODUCT_MODULE_NAME: InfluxVideo
+        PRODUCT_BUNDLE_IDENTIFIER: $(INFLUX_BUNDLE_IDENTIFIER).video
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
+
+  # iCloud sync (Influx/Sync), kept out of the app binary so CloudKit doesn't
+  # load at launch.
+  InfluxSync-iOS:
+    type: framework
+    platform: iOS
+    sources:
+      - path: Influx/Sync
+    settings:
+      base:
+        PRODUCT_NAME: InfluxSync
+        PRODUCT_MODULE_NAME: InfluxSync
+        PRODUCT_BUNDLE_IDENTIFIER: $(INFLUX_BUNDLE_IDENTIFIER).sync
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
+
+  # iCloud sync (Influx/Sync), kept out of the app binary so CloudKit doesn't
+  # load at launch.
+  InfluxSync-macOS:
+    type: framework
+    platform: macOS
+    sources:
+      - path: Influx/Sync
+    settings:
+      base:
+        PRODUCT_NAME: InfluxSync
+        PRODUCT_MODULE_NAME: InfluxSync
+        PRODUCT_BUNDLE_IDENTIFIER: $(INFLUX_BUNDLE_IDENTIFIER).sync
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
+
+  # Field performance reports (Influx/Metrics, ADR 0034), kept out of the
+  # app binary so MetricKit and StoreKit don't load at launch.
+  InfluxMetrics-iOS:
+    type: framework
+    platform: iOS
+    sources:
+      - path: Influx/Metrics
+    settings:
+      base:
+        PRODUCT_NAME: InfluxMetrics
+        PRODUCT_MODULE_NAME: InfluxMetrics
+        PRODUCT_BUNDLE_IDENTIFIER: $(INFLUX_BUNDLE_IDENTIFIER).metrics
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
+
+  # Field performance reports (Influx/Metrics, ADR 0034), kept out of the
+  # app binary so MetricKit and StoreKit don't load at launch.
+  InfluxMetrics-macOS:
+    type: framework
+    platform: macOS
+    sources:
+      - path: Influx/Metrics
+    settings:
+      base:
+        PRODUCT_NAME: InfluxMetrics
+        PRODUCT_MODULE_NAME: InfluxMetrics
+        PRODUCT_BUNDLE_IDENTIFIER: $(INFLUX_BUNDLE_IDENTIFIER).metrics
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
+        SKIP_INSTALL: YES
+
+  InfluxTests-iOS:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: InfluxTests
+    dependencies:
+      - target: Influx-iOS
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        # The app's product name differs from its target name, so XcodeGen's
+        # default test host path would not exist.
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/$(INFLUX_PRODUCT_NAME).app/$(INFLUX_PRODUCT_NAME)"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        PRODUCT_BUNDLE_IDENTIFIER: dev.bespokebits.influx.tests
+
+  InfluxTests-macOS:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: InfluxTests
+    dependencies:
+      - target: Influx-macOS
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/$(INFLUX_PRODUCT_NAME).app/Contents/MacOS/$(INFLUX_PRODUCT_NAME)"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        PRODUCT_BUNDLE_IDENTIFIER: dev.bespokebits.influx.tests
+
+  # UI tests launch the app, so they run in their own scheme
+  # (InfluxUITests-iOS), not in the unit-test schemes verify.sh runs.
+  InfluxUITests-iOS:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: InfluxUITests
+    dependencies:
+      - target: Influx-iOS
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: dev.bespokebits.influx.uitests
+
+schemes:
+  Influx-iOS:
+    build:
+      targets:
+        Influx-iOS: all
+        InfluxTests-iOS: [test]
+    run:
+      config: Debug
+      # Runs from Xcode show the sample timeline and the hitch counter.
+      # Untick them in the scheme to use the real store.
+      commandLineArguments:
+        "-InfluxSeedTimeline YES": true
+        "-InfluxShowScrollDiagnostics YES": true
+    test:
+      config: Test
+      targets:
+        - InfluxTests-iOS
+    archive:
+      config: Release
+
+  Influx-macOS:
+    build:
+      targets:
+        Influx-macOS: all
+        InfluxTests-macOS: [test]
+    run:
+      config: Debug
+      commandLineArguments:
+        "-InfluxSeedTimeline YES": true
+        "-InfluxShowScrollDiagnostics YES": true
+    test:
+      config: Test
+      targets:
+        - InfluxTests-macOS
+    archive:
+      config: Release
+
+  InfluxUITests-iOS:
+    build:
+      targets:
+        Influx-iOS: all
+        InfluxUITests-iOS: [test]
+    test:
+      # The Test configuration is a debug build, so hitch numbers from it are
+      # a pessimistic bound. The real ones come from Perf on the device:
+      # release optimisation under its own bundle ID, so the run never
+      # replaces the reader's app. The signing wrapper that iphone-perf.sh
+      # calls names Perf itself. The Test bundle ID keeps simulator runs
+      # away from the real app's data.
+      config: Test
+      targets:
+        - InfluxUITests-iOS

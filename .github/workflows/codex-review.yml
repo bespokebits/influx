@@ -1,0 +1,37 @@
+# Thin caller for the org's codex-review status (bespokebits/org-workflows; the reusable
+# workflow's header documents it). Copy unchanged into .github/workflows/codex-review.yml,
+# including into the private source of a dual repo. It posts the commit status
+# `codex-review`: pending until Codex has reviewed the pull request's head commit. On a
+# push, a draft or a reopen it asks Codex with an `@codex review` comment, which needs
+# pull-requests: write. Make `codex-review` a required status check, with "all
+# conversations resolved" beside it.
+# The reusable job selects Ubicloud's managed runner for all callers.
+name: codex-review
+
+on:
+  # pull_request_target, so the default branch's copy of this file runs: a pull request
+  # cannot change or remove it. Safe because the job checks out and runs nothing.
+  pull_request_target:
+    # edited: a retarget to another base keeps the head commit, so the status for it must
+    # stop counting. Title and body edits start nothing (the job condition below).
+    types: [opened, reopened, synchronize, ready_for_review, edited]
+  # Codex edits its one status comment in place when a review finishes.
+  issue_comment:
+    types: [created, edited]
+
+permissions: {}
+
+jobs:
+  codex-review:
+    # Start nothing for a comment that is not on a pull request or not Codex's. This is
+    # only a first filter, by login so that this file carries no long number (a records
+    # or publish scanner can read one as an account number); the reusable job decides,
+    # by the account id of both the comment's author and its editor.
+    if: >-
+      (github.event_name == 'pull_request_target' &&
+       (github.event.action != 'edited' || github.event.changes.base)) ||
+      (github.event.issue.pull_request && github.event.comment.user.login == 'chatgpt-codex-connector[bot]')
+    permissions:
+      statuses: write
+      pull-requests: write
+    uses: bespokebits/org-workflows/.github/workflows/codex-review.yml@main

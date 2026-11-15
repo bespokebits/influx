@@ -1,0 +1,13 @@
+{
+  "method": "GET",
+  "endpoint": "https://example.com/oauth/authorize",
+  "query": {
+    "response_type": "code",
+    "client_id": "influx",
+    "redirect_uri": "dev.bespokebits.influx:/oauth/sammy",
+    "scope": "feeds:read",
+    "state": "Contract-State_0123456789.~",
+    "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+    "code_challenge_method": "S256"
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "first": {
+    "request": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003",
+    "page": {
+      "format": "sammy.rich-feed",
+      "version": 1,
+      "feed": {
+        "id": "0193a1b2-0000-7000-8000-00000000f003",
+        "title": "Authored posts",
+        "description": "Full authored posts from a configured source.",
+        "feedUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003"
+      },
+      "source": {
+        "id": "urn:uuid:14d5d292-767a-8624-adb2-42f1bd24c8ff",
+        "kind": "author",
+        "title": "Example Author",
+        "url": "https://www.example.com/author/",
+        "aliases": [
+          "urn:uuid:b12b27da-1c8d-8180-8d92-78ccd089c040"
+        ]
+      },
+      "nextUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003?before=contract-page-2",
+      "sinceUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003?since=contract-since-1",
+      "items": [
+        {
+          "id": "urn:uuid:a88fb006-9ffe-8371-918e-6e6c370b9d34",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000080",
+          "aliases": [],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text"
+          ],
+          "url": "https://www.example.com/author/posts/80",
+          "author": {
+            "name": "Example Author",
+            "url": "https://www.example.com/author/"
+          },
+          "text": "A new post at the top of the feed.",
+          "links": [],
+          "publishedAt": "2026-11-03T11:00:00Z"
+        }
+      ]
+    }
+  },
+  "late": {
+    "request": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003?since=contract-since-1",
+    "page": {
+      "format": "sammy.rich-feed",
+      "version": 1,
+      "feed": {
+        "id": "0193a1b2-0000-7000-8000-00000000f003",
+        "title": "Authored posts",
+        "description": "Full authored posts from a configured source.",
+        "feedUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003"
+      },
+      "source": {
+        "id": "urn:uuid:14d5d292-767a-8624-adb2-42f1bd24c8ff",
+        "kind": "author",
+        "title": "Example Author",
+        "url": "https://www.example.com/author/",
+        "aliases": [
+          "urn:uuid:b12b27da-1c8d-8180-8d92-78ccd089c040"
+        ]
+      },
+      "sinceUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003?since=contract-since-2",
+      "items": [
+        {
+          "id": "urn:uuid:6e840199-e929-8371-b1db-4d24ea661da0",
+          "canonicalId": "urn:uuid:0193a1b2-0000-7000-8000-000000000081",
+          "aliases": [],
+          "classification": {
+            "kind": "post",
+            "retentionDays": 7
+          },
+          "capabilities": [
+            "text",
+            "repost"
+          ],
+          "url": "https://www.example.com/other/posts/81",
+          "author": {
+            "name": "Another Author",
+            "url": "https://www.example.com/other/",
+            "avatar": {
+              "id": "example-avatar-2"
+            },
+            "handle": "@another_author"
+          },
+          "repostedBy": {
+            "name": "Example Author",
+            "url": "https://www.example.com/author/"
+          },
+          "text": "An older post by another author, reposted after the first read.",
+          "links": [],
+          "publishedAt": "2026-11-01T09:00:00Z"
+        }
+      ]
+    }
+  },
+  "nothingNew": {
+    "request": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003?since=contract-since-2",
+    "page": {
+      "format": "sammy.rich-feed",
+      "version": 1,
+      "feed": {
+        "id": "0193a1b2-0000-7000-8000-00000000f003",
+        "title": "Authored posts",
+        "description": "Full authored posts from a configured source.",
+        "feedUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003"
+      },
+      "source": {
+        "id": "urn:uuid:14d5d292-767a-8624-adb2-42f1bd24c8ff",
+        "kind": "author",
+        "title": "Example Author",
+        "url": "https://www.example.com/author/",
+        "aliases": [
+          "urn:uuid:b12b27da-1c8d-8180-8d92-78ccd089c040"
+        ]
+      },
+      "sinceUrl": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003?since=contract-since-2",
+      "items": []
+    }
+  },
+  "refused": [
+    {
+      "request": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003?before=contract-page-2&since=contract-since-1",
+      "status": 400,
+      "body": {
+        "error": "Invalid cursor"
+      }
+    },
+    {
+      "request": "https://example.com/api/v1/feeds/0193a1b2-0000-7000-8000-00000000f003?since=not%20a%20token",
+      "status": 400,
+      "body": {
+        "error": "Invalid cursor"
+      }
+    }
+  ]
+}

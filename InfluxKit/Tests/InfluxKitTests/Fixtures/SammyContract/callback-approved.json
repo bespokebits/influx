@@ -1,0 +1,8 @@
+{
+  "url": "dev.bespokebits.influx:/oauth/sammy?code=contract-example-authorization-code&state=Contract-State_0123456789.%7E&iss=https%3A%2F%2Fexample.com",
+  "params": {
+    "code": "contract-example-authorization-code",
+    "state": "Contract-State_0123456789.~",
+    "iss": "https://example.com"
+  }
+}
