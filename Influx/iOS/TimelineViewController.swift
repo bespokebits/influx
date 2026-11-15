@@ -19,9 +19,9 @@ final class TimelineViewController: UIViewController, UICollectionViewDelegate, 
     private var collectionView: TimelineCollectionView!
     private var dataSource: UICollectionViewDiffableDataSource<Int, String>!
     private let unreadPill = UIButton(configuration: .filled())
-    private let pullMark = PullSyncMark.Pull()
+    private let pullRefresh = PullRefreshMark.Refresh()
     /// The mark below the last row, made on the first pull.
-    private var pullMarkView: UIView?
+    private var pullMarkView: PullRingView?
     private var isPullRefreshing = false
     private var hud: UILabel?
     /// Perf runs: whether the launch time to the first rows is recorded.
@@ -511,21 +511,21 @@ final class TimelineViewController: UIViewController, UICollectionViewDelegate, 
     }
 
     /// The mark, made the first time it's needed: most launches never pull.
-    private func makePullMark() -> UIView {
+    private func makePullMark() -> PullRingView {
         if let pullMarkView { return pullMarkView }
-        let host = UIHostingController(rootView: PullSyncMark(state: pullMark))
+        let host = UIHostingController(rootView: PullRefreshMark(state: pullRefresh))
         host.sizingOptions = []
         host.view.backgroundColor = .clear
         host.view.isUserInteractionEnabled = false
-        host.view.bounds = CGRect(x: 0, y: 0, width: Self.markSize, height: Self.markSize)
-        host.view.accessibilityIdentifier = "refresh-indicator"
         addChild(host)
+        let mark = PullRingView(size: Self.markSize, refreshView: host.view)
+        mark.accessibilityIdentifier = "refresh-indicator"
         // In the collection view, so it scrolls with the rows it sits below.
-        collectionView.addSubview(host.view)
+        collectionView.addSubview(mark)
         host.didMove(toParent: self)
-        pullMarkView = host.view
+        pullMarkView = mark
         placeRefreshIndicator()
-        return host.view
+        return mark
     }
 
     /// Centres the mark in the space just below the last row.
@@ -535,8 +535,8 @@ final class TimelineViewController: UIViewController, UICollectionViewDelegate, 
         if pullMarkView.center != center { pullMarkView.center = center }
     }
 
-    /// Draws the mark in as the reader pulls, whole once letting go would
-    /// refresh.
+    /// Fills the ring as the reader pulls, whole (and in ink) once letting
+    /// go would refresh.
     private func showPullProgress() {
         guard !isPullRefreshing else { return }
         let past = collectionView.isTracking ? pastNewestEdge : 0
@@ -546,7 +546,7 @@ final class TimelineViewController: UIViewController, UICollectionViewDelegate, 
         // Visible as soon as the pull starts; the drawing shows how far.
         let alpha: CGFloat = pull > 0 ? 1 : 0
         if alpha != mark.alpha { mark.alpha = alpha }
-        if pull != pullMark.pull { pullMark.pull = pull }
+        mark.setPull(pull)
     }
 
     private func refreshFromPull() {
@@ -555,32 +555,34 @@ final class TimelineViewController: UIViewController, UICollectionViewDelegate, 
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         let mark = makePullMark()
         mark.alpha = 1
-        pullMark.pull = 1
-        pullMark.phase = .syncing
+        mark.setPull(1)
+        pullRefresh.phase = .syncing
+        mark.showsRefresh = true
         collectionView.contentInset.bottom += Self.indicatorSpace
         let sync = app.sync
-        // A pull syncs too, so the dots show iCloud as well as the feeds.
+        // A pull syncs too, so the ring shows iCloud as well as the feeds.
         sync?.tapped()
         Task { [weak self, app] in
             let began = ContinuousClock.now
             await app.refreshNow()
-            // Circling until the sync lands, for a little while at most.
+            // Chasing until the sync lands, for a little while at most.
             while let sync, sync.status.isCatchingUp, ContinuousClock.now - began < .seconds(10) {
                 try? await Task.sleep(for: .milliseconds(100))
             }
-            // At least one turn of the dots, so a quick refresh isn't a flicker.
+            // At least one turn of the chase, so a quick refresh isn't a flicker.
             let shown = ContinuousClock.now - began
             if shown < .milliseconds(1_200) { try? await Task.sleep(for: .milliseconds(1_200) - shown) }
             guard let self else { return }
             // A sync still going after the wait isn't shown as done: the
-            // space closes on the circling dots, and the bar's mark goes on.
+            // space closes on the chasing arcs, and the bar's mark goes on.
             if sync?.status.isCatchingUp != true {
                 let failed: Bool
                 if case .failed? = sync?.status.phase { failed = true } else { failed = false }
-                let end: SlipsMark.Phase = failed ? .failed : .synced
-                pullMark.phase = end
-                // The dots come to rest, and stay a moment before the space closes.
-                try? await Task.sleep(for: .seconds((SlipsMark.settleTime(end) ?? 1) + (failed ? 1.2 : 0.4)))
+                let end: RingMark.Phase = failed ? .failed : .synced
+                pullRefresh.phase = end
+                // The ring settles, and stays a moment before the space closes.
+                let settle = RingMark.settleTime(end, reduceMotion: UIAccessibility.isReduceMotionEnabled) ?? 1
+                try? await Task.sleep(for: .seconds(settle + (failed ? 1.2 : 0.4)))
             }
             isPullRefreshing = false
             UIView.animate(withDuration: 0.2) {
@@ -598,8 +600,8 @@ final class TimelineViewController: UIViewController, UICollectionViewDelegate, 
             } completion: { _ in
                 // Ready to draw in again on the next pull, unless one began.
                 guard !self.isPullRefreshing else { return }
-                self.pullMark.phase = nil
-                self.pullMark.pull = 0
+                self.pullRefresh.phase = nil
+                mark.showsRefresh = false
             }
         }
     }

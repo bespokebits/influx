@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The sync button in the timeline's bar: the In tray mark, showing
-/// iCloud sync's state. Tapping it syncs now, or tries again after a
-/// failure, and opens the sync status panel.
+/// The sync button in the timeline's bar: the Full Circle ring
+/// (`RingMark`), showing iCloud sync's state. Tapping it syncs now, or
+/// tries again after a failure, and opens the sync status panel.
 struct SyncButton: View {
     let sync: Sync
     @State private var showsStatus = false
@@ -13,7 +13,7 @@ struct SyncButton: View {
             sync.tapped()
             showsStatus = true
         } label: {
-            SlipsMarkView(phase: phase.mark)
+            RingMarkView(phase: phase.ring)
                 .frame(width: 24, height: 24)
         }
         .accessibilityLabel("Sync")
@@ -30,6 +30,15 @@ struct SyncButton: View {
 
 extension SyncStatus.Phase {
     var mark: SlipsMark.Phase {
+        switch self {
+        case .starting: .starting
+        case .syncing: .syncing
+        case .synced: .synced
+        case .failed: .failed
+        }
+    }
+
+    var ring: RingMark.Phase {
         switch self {
         case .starting: .starting
         case .syncing: .syncing
@@ -165,32 +174,155 @@ extension Color {
     }
 }
 
-/// The mark below the newest row on iOS, in place of a spinner: as
-/// the reader pulls, the tray draws itself and the dots fly in, and once
-/// they let go it shows the sync the pull started.
-struct PullSyncMark: View {
-    @Observable
-    @MainActor
-    final class Pull {
-        /// How far the reader has pulled, 0 to 1: 1 refreshes on letting go.
-        var pull: CGFloat = 0
-        /// The refresh under way, or nil while pulling.
-        var phase: SlipsMark.Phase?
+/// Draws `RingMark`, moving only while a phase is in motion: once a
+/// phase settles, its timeline pauses and the last frame stays.
+struct RingMarkView: View {
+    let phase: RingMark.Phase
+    /// Whether the first phase moves from the start rather than showing
+    /// as it already is.
+    var entering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var clock = Clock()
+    /// When the phase whose motion has finished began, so a later run of
+    /// the same phase moves again.
+    @State private var settledSince: Date?
+
+    var body: some View {
+        let clock = clock.moved(to: phase, entering: entering, reduceMotion: reduceMotion)
+        let settled = settledSince == clock.since
+        TimelineView(.animation(paused: settled)) { context in
+            Canvas { gc, size in
+                let elapsed = settled ? .greatestFiniteMagnitude : context.date.timeIntervalSince(clock.since)
+                Self.draw(RingMark.frame(clock.phase, elapsed: elapsed, fromAngle: clock.fromAngle, reduceMotion: reduceMotion),
+                          in: &gc, size: size)
+            }
+        }
+        .accessibilityHidden(true)
+        .task(id: clock.since) {
+            guard let settle = RingMark.settleTime(clock.phase, reduceMotion: reduceMotion) else { return }
+            let since = clock.since
+            let left = settle - Date.now.timeIntervalSince(since)
+            if left > 0 { try? await Task.sleep(for: .seconds(left + 0.05)) }
+            if !Task.isCancelled { settledSince = since }
+        }
     }
 
-    let state: Pull
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// When the current phase began, and where the chase had turned to then.
+    @MainActor
+    final class Clock {
+        private(set) var phase: RingMark.Phase = .starting
+        private(set) var since = Date.distantPast
+        private(set) var fromAngle: Double = 0
+        private var started = false
+
+        func moved(to next: RingMark.Phase, entering: Bool, reduceMotion: Bool) -> Clock {
+            let now = Date.now
+            if !started {
+                // A window opened after launch shows the state as it is,
+                // without replaying how it got there.
+                started = true
+                phase = next
+                since = next == .starting || entering ? now : .distantPast
+            } else if next != phase {
+                if phase == .starting || phase == .syncing {
+                    fromAngle = RingMark.chaseAngle(now.timeIntervalSince(since), reduceMotion: reduceMotion)
+                }
+                phase = next
+                since = now
+            }
+            return self
+        }
+    }
+
+    private static let sources = [0, 1, 3].map { Color.paint(Broadsheet.sourceColor($0)) }
+
+    static func color(_ tint: RingMark.Tint) -> Color {
+        switch tint {
+        case .ink: .paint(Broadsheet.ink)
+        case .ink2: .paint(Broadsheet.ink2)
+        case .alarm: .paint(Broadsheet.alarm)
+        }
+    }
+
+    /// The circle, starting at the top and going clockwise.
+    private static let circle = Path { path in
+        path.addArc(center: RingMark.center, radius: RingMark.radius,
+                    startAngle: .degrees(-90), endAngle: .degrees(270), clockwise: false)
+    }
+
+    private static func about(_ scale: CGSize) -> CGAffineTransform {
+        let c = RingMark.center
+        return CGAffineTransform(translationX: c.x, y: c.y).scaledBy(x: scale.width, y: scale.height)
+            .translatedBy(x: -c.x, y: -c.y)
+    }
+
+    static func draw(_ frame: RingMark.Frame, in gc: inout GraphicsContext, size: CGSize) {
+        gc.scaleBy(x: size.width / 24, y: size.height / 24)
+        let line = StrokeStyle(lineWidth: RingMark.stroke, lineCap: .round, lineJoin: .round)
+        let tint = color(frame.tint)
+
+        if frame.trackOpacity > 0, frame.trackDrawn > 0 {
+            gc.stroke(circle.trimmedPath(from: 0, to: frame.trackDrawn),
+                      with: .color(Color.paint(Broadsheet.rule).opacity(frame.trackOpacity)), style: line)
+        }
+
+        for i in 0..<3 where frame.arcOpacities[i] > 0 && frame.arcLengths[i] > 0 {
+            let start = -90 + frame.chaseAngle + RingMark.arcOffsets[i]
+            let arc = Path { path in
+                path.addArc(center: RingMark.center, radius: RingMark.radius, startAngle: .degrees(start),
+                            endAngle: .degrees(start + Double(frame.arcLengths[i]) * 360), clockwise: false)
+            }
+            gc.stroke(arc, with: .color(sources[i].opacity(frame.arcOpacities[i])),
+                      style: StrokeStyle(lineWidth: RingMark.arcStroke, lineCap: .round))
+        }
+
+        if frame.impressionOpacity > 0 {
+            let scale = CGSize(width: frame.impressionScale, height: frame.impressionScale)
+            gc.stroke(circle.applying(about(scale)), with: .color(tint.opacity(frame.impressionOpacity)), style: line)
+        }
+
+        if frame.ringOpacity > 0, frame.ringDrawn > 0 {
+            gc.stroke(circle.trimmedPath(from: 0, to: frame.ringDrawn).applying(about(frame.ringScale)),
+                      with: .color(tint.opacity(frame.ringOpacity)), style: line)
+        }
+
+        if frame.tickOpacity > 0, frame.tickDrawn > 0 {
+            var tick = Path()
+            tick.addLines(RingMark.tick)
+            gc.stroke(tick.trimmedPath(from: 0, to: frame.tickDrawn), with: .color(tint.opacity(frame.tickOpacity)), style: line)
+        }
+
+        if frame.exclamationOpacity > 0, frame.exclamationScale > 0 {
+            let pop = about(CGSize(width: frame.exclamationScale, height: frame.exclamationScale))
+            var bar = Path()
+            bar.move(to: RingMark.exclamationTop)
+            bar.addLine(to: RingMark.exclamationBottom)
+            gc.stroke(bar.applying(pop), with: .color(tint.opacity(frame.exclamationOpacity)), style: line)
+            let r = RingMark.exclamationPointRadius, p = RingMark.exclamationPoint
+            gc.fill(Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: 2 * r, height: 2 * r)).applying(pop),
+                    with: .color(tint.opacity(frame.exclamationOpacity)))
+        }
+    }
+}
+
+/// The pull-to-refresh mark once the reader lets go: the refresh it
+/// started, as the sync button draws it. While the reader pulls, iOS
+/// draws the ring with layers instead (`PullRingView`), so a scroll event
+/// changes no SwiftUI state.
+struct PullRefreshMark: View {
+    @Observable
+    @MainActor
+    final class Refresh {
+        /// The refresh under way, or nil when there is none.
+        var phase: RingMark.Phase?
+    }
+
+    let state: Refresh
 
     var body: some View {
         Group {
             if let phase = state.phase {
-                SlipsMarkView(phase: phase, entering: true)
-            } else {
-                let elapsed = Double(state.pull) * SlipsMark.introLength
-                Canvas { gc, size in
-                    SlipsMarkView.draw(SlipsMark.frame(.starting, elapsed: elapsed, reduceMotion: reduceMotion),
-                                       in: &gc, size: size)
-                }
+                RingMarkView(phase: phase, entering: true)
             }
         }
         .accessibilityHidden(true)
