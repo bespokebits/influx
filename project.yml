@@ -99,11 +99,12 @@ settings:
       INFLUX_MAC_CLOUDKIT_LDFLAGS: -framework CloudKit
       INFLUX_LEGACY_KEYCHAIN_GROUP: dev.bespokebits.flux
       INFLUX_APP_ATTEST_ENVIRONMENT: production
-    # Release's optimisation under its own bundle ID, for the performance
-    # run on the phone (scripts/iphone-perf.sh). Hitch numbers need a
-    # release build, but installing Release would replace the reader's own
-    # app, relaunch it with sample data and move its reading place. Perf
-    # installs beside it and never syncs, like Debug and Test.
+    # Release's optimisation under its own bundle ID, for performance runs.
+    # Hitch numbers need a release build, but a Release build would replace
+    # the reader's own app, relaunch it with sample data and move its
+    # reading place. Perf installs beside it and never syncs, like Debug and
+    # Test. Device performance runs are retired (AGENTS.md); field metrics
+    # from TestFlight installs judge the bar.
     Perf:
       INFLUX_BUNDLE_IDENTIFIER: dev.bespokebits.influx.perf
       INFLUX_PRODUCT_NAME: "Influx Perf"
@@ -500,11 +501,9 @@ schemes:
         InfluxUITests-iOS: [test]
     test:
       # The Test configuration is a debug build, so hitch numbers from it are
-      # a pessimistic bound. The real ones come from Perf on the device:
-      # release optimisation under its own bundle ID, so the run never
-      # replaces the reader's app. The signing wrapper that iphone-perf.sh
-      # calls names Perf itself. The Test bundle ID keeps simulator runs
-      # away from the real app's data.
+      # a pessimistic bound, compared only with the last run's own figures
+      # (AGENTS.md). The Test bundle ID keeps simulator runs away from the
+      # real app's data.
       config: Test
       targets:
         - InfluxUITests-iOS

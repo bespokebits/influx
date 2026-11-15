@@ -12,8 +12,8 @@
 #                                     without running them
 #
 # A build machine that must run Xcode through a wrapper names it once, in the
-# environment or in ~/.config/influx/devices.conf (the file install-mvp.sh
-# reads; it holds IDs and paths, no secrets):
+# environment or in ~/.config/influx/devices.conf (a local file of IDs and
+# paths, never committed, no secrets):
 #   INFLUX_XCODEBUILD       the command to run in place of `xcodebuild`, with
 #                           any arguments of its own, split on spaces
 #   INFLUX_SIMULATOR_UDID   the iOS simulator to test on, by UDID; without it
@@ -27,7 +27,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# devices.conf, as in install-mvp.sh; ~/.config/flux is its older home.
+# devices.conf; ~/.config/flux is its older home.
 devices_env="${INFLUX_DEVICES_ENV:-${FLUX_DEVICES_ENV:-}}"
 if [[ -z "$devices_env" ]]; then
   devices_env="$HOME/.config/influx/devices.conf"
