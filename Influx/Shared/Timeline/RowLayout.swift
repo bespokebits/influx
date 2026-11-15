@@ -54,6 +54,9 @@ struct RowGeometry: Sendable, Equatable {
     /// The light-action icons along the bottom of a row, one per
     /// `RowAction.available(for:)`, in order; empty when no action applies.
     var actions: [CGRect] = []
+    /// A late row's received time, on its own line under the header when
+    /// the header is too narrow to hold it beside the name (#261).
+    var received: CGRect? = nil
 }
 
 /// The icons along the bottom of a post: open its thread (where its
@@ -126,7 +129,12 @@ enum RowLayout {
         let dot = CGRect(x: left, y: y + (metaHeight - dotSize) / 2, width: dotSize, height: dotSize)
         let headerX = left + dotSize + 8
         let headerWidth = max(left + textWidth - headerX, 1)
-        let timeWidth = singleLineWidth(RowText.time(row, type))
+        // A late row's received time goes on a line of its own when, beside
+        // it, the name would keep less than six ems; it is never cut.
+        let shortName = min(singleLineWidth(RowText.headerName(row, type, withHandle: false)), type.meta.pointSize * 6)
+        let receivedText = RowText.receivedLine(row, type)
+        let splitsReceived = receivedText != nil && singleLineWidth(RowText.time(row, type)) + shortName > headerWidth
+        let timeWidth = singleLineWidth(RowText.time(row, type, withReceived: !splitsReceived))
         let whole = singleLineWidth(RowText.headerName(row, type, withHandle: true))
         let fits = whole + timeWidth <= headerWidth
         // When it doesn't all fit, the name keeps the line with the time
@@ -137,6 +145,14 @@ enum RowLayout {
         let header = CGRect(x: headerX, y: y, width: nameWidth, height: metaHeight)
         let time = CGRect(x: header.maxX, y: y, width: min(timeWidth, headerWidth), height: metaHeight)
         y += metaHeight
+
+        var received: CGRect?
+        if splitsReceived, let receivedText {
+            y += 2
+            let height = lines(receivedText, width: headerWidth, font: type.meta, max: metaLines)
+            received = CGRect(x: headerX, y: y, width: headerWidth, height: height)
+            y += height
+        }
 
         var handle: CGRect?
         if !fits, let text = RowText.handle(row, type) {
@@ -287,12 +303,14 @@ enum RowLayout {
         // A short post is never shorter than its avatar.
         y = max(y, avatar.maxY)
         y += bottom
-        return RowGeometry(width: width, height: ceil(y), avatar: avatar, dot: dot, header: header, time: time,
+        var geometry = RowGeometry(width: width, height: ceil(y), avatar: avatar, dot: dot, header: header, time: time,
                            handle: handle, context: context,
                            boosterAvatar: boosterAvatar, badge: badge, title: title, body: body, link: link, linkImage: linkImage,
                            linkSite: linkSite, linkTitle: linkTitle, linkSummary: linkSummary, media: media,
                            quote: quote, quoteImage: quoteImage, quoteHeader: quoteHeader, quoteBody: quoteBody,
                            quoteSite: quoteSite, actions: actions)
+        geometry.received = received
+        return geometry
     }
 
     /// The height of `text` at `width`, cut to at most `max` lines of

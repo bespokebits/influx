@@ -37,6 +37,8 @@ enum Broadsheet {
     }
 
     static let alarm = dynamic(light: (0.702, 0.149, 0.118), dark: (0.941, 0.439, 0.404))
+    /// A late row's received time and its arrow (#261): warm, 4.5:1 or more on paper in both themes.
+    static let late = dynamic(light: (0.584, 0.353, 0.0), dark: (0.886, 0.651, 0.294))
 
     /// Source-dot palette, indexed by `Source.colorIndex`.
     static let sourceColors: [PlatformColor] = [

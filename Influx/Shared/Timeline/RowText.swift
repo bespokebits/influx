@@ -29,11 +29,46 @@ enum RowText {
 
     /// The header shows when the row's item was posted, or boosted for a
     /// boost, whose context line carries the original time. A row that
-    /// arrived late can sit below its own time's place (ADR 0041), but
-    /// still shows its own time.
-    static func time(_ row: TimelineRow, _ type: Typography) -> NSAttributedString {
-        let time = shownDate(row).formatted(.dateTime.weekday(.abbreviated).hour().minute())
-        return NSAttributedString(string: " · \(time)", attributes: attributes(type.meta, Broadsheet.ink2, singleLine: true))
+    /// arrived late can sit below its own time's place (ADR 0041): it still
+    /// shows its own time, then an arrow and the time where it sits, in the
+    /// late colour (#261): "Sun 5:11 PM → 5:19 PM".
+    /// `withReceived` false leaves the received time out, for a header
+    /// too narrow to hold it: it then takes a line of its own
+    /// (`receivedLine`).
+    static func time(_ row: TimelineRow, _ type: Typography, withReceived: Bool = true) -> NSAttributedString {
+        let posted = shownDate(row)
+        let text = NSMutableAttributedString(string: " · \(posted.formatted(.dateTime.weekday(.abbreviated).hour().minute()))",
+                                             attributes: attributes(type.meta, Broadsheet.ink2, singleLine: true))
+        if withReceived, let received = receivedDate(row) {
+            text.append(NSAttributedString(string: " → \(receivedText(received, posted: posted))",
+                                           attributes: attributes(type.meta, Broadsheet.late, singleLine: true)))
+        }
+        return text
+    }
+
+    /// A late row's received time on a line of its own, under the header:
+    /// "→ 5:19 PM". Nil for a row that sits at its own time.
+    static func receivedLine(_ row: TimelineRow, _ type: Typography) -> NSAttributedString? {
+        guard let received = receivedDate(row) else { return nil }
+        return NSAttributedString(string: "→ \(receivedText(received, posted: shownDate(row)))",
+                                  attributes: attributes(type.meta, Broadsheet.late))
+    }
+
+    /// Where a row that arrived late sits, for one placed at least a
+    /// minute after its own time: below the reader's line (ADR 0041), where
+    /// another device placed it, or where an earlier copy of the post put
+    /// it. Nil for a row that sits at its own time.
+    static func receivedDate(_ row: TimelineRow) -> Date? {
+        guard let posted = row.postedAt, row.sortDate.timeIntervalSince(posted) >= 60 else { return nil }
+        return row.sortDate
+    }
+
+    /// The received time, with its day only when that differs from the
+    /// posted time's.
+    static func receivedText(_ received: Date, posted: Date) -> String {
+        Calendar.current.isDate(received, inSameDayAs: posted)
+            ? received.formatted(.dateTime.hour().minute())
+            : received.formatted(.dateTime.weekday(.abbreviated).hour().minute())
     }
 
     /// The time a row shows: its item's own, or where it sits for a row
@@ -108,7 +143,12 @@ enum RowText {
             if let image = quote.image { parts.append(mediaLabel(image)) }
         }
         parts += row.media.map(mediaLabel)
-        parts.append(shownDate(row).formatted(date: .abbreviated, time: .shortened))
+        let posted = shownDate(row)
+        if let received = receivedDate(row) {
+            parts.append("Posted \(posted.formatted(date: .abbreviated, time: .shortened)), received \(receivedText(received, posted: posted))")
+        } else {
+            parts.append(posted.formatted(date: .abbreviated, time: .shortened))
+        }
         if let viewer = row.viewer {
             let state = [viewer.liked ? "Liked" : nil, viewer.boosted ? "Boosted" : nil, viewer.bookmarked ? "Bookmarked" : nil].compactMap { $0 }
             if !state.isEmpty { parts.append(state.joined(separator: ", ")) }
