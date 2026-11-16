@@ -39,3 +39,8 @@ InfluxKit/Tests/InfluxKitTests/Fixtures/merging/mastodon-example-social.json | e
 
 # The OAuth Worker refuses an audience URL with user info in it.
 server/oauth-worker/test/index.test.ts | email-address | u[@]bsky[.]social
+
+# The public feedback and privacy contact, on the privacy page and in the
+# TestFlight test information.
+server/oauth-worker/public/privacy.html | email-address | influx-feedback[@]bespokebits[.]dev
+scripts/testflight.mjs | email-address | influx-feedback[@]bespokebits[.]dev
