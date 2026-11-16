@@ -22,8 +22,15 @@
 // Credentials: an App Store Connect API key, from the file named by
 // INFLUX_ASC_ENV (default ~/.config/influx/asc.env, mode 600, never
 // committed), with ASC_KEY_ID, ASC_ISSUER_ID and ASC_P8_BASE64 (the .p8,
-// base64). The key needs a role that may start Xcode Cloud builds.
-// Nothing here prints the key.
+// base64). The key needs the App Manager role: `start` and `wait` would do
+// with less, but App Store Connect refuses `prepare`, `submit` and
+// `public-link` to any role below App Manager. Nothing here prints the key.
+//
+// Public testing also needs the workflow's archives to be made for the App
+// Store: Distribution Preparation "App Store Connect", not "TestFlight
+// (Internal Testing Only)". A build archived for internal testing only can
+// never join an external group. `external` shows the setting; it can be
+// changed only in the workflow editor, as the API refuses it.
 //
 // `prepare` also reads the Beta App Review contact, which Apple keeps private,
 // from INFLUX_REVIEW_CONTACT (default ~/.config/influx/review-contact.env,
@@ -211,7 +218,7 @@ async function buildsOf(run) {
  *  newest builds' external state. Prints values that are public on the
  *  TestFlight page, and only whether the review contact is filled in. */
 async function external() {
-  const { app } = await product();
+  const { app, product: ci } = await product();
   const set = (value) => (value ? "set" : "MISSING");
   console.log(`app: ${app.attributes.name} (${app.attributes.bundleId}), primary locale ${app.attributes.primaryLocale}`);
   const localizations = (await api(`/v1/apps/${app.id}/betaAppLocalizations`)).data;
@@ -233,6 +240,11 @@ async function external() {
       (a.isInternalGroup ? "" : `, public link ${a.publicLinkEnabled ? `on (${a.publicLink}, limit ${a.publicLinkLimit ?? "none"})` : "off"}`));
   }
   if (!groups.some((g) => !g.attributes.isInternalGroup)) console.log("external group: MISSING");
+  for (const a of (await api(`/v1/ciWorkflows/${(await workflow(ci.id)).id}`)).data.attributes.actions ?? []) {
+    if (a.actionType !== "ARCHIVE") continue;
+    const audience = { APP_STORE_ELIGIBLE: "App Store Connect", INTERNAL_ONLY: "internal testing only: its builds can't go external" };
+    console.log(`workflow "${WORKFLOW}", ${a.name}: ${audience[a.buildDistributionAudience] ?? a.buildDistributionAudience ?? "?"}`);
+  }
   const builds = await api(`/v1/builds?filter[app]=${app.id}&sort=-uploadedDate&limit=4&include=buildBetaDetail,preReleaseVersion`);
   const included = Object.fromEntries((builds.included ?? []).map((i) => [`${i.type}:${i.id}`, i.attributes]));
   for (const b of builds.data) {
@@ -328,10 +340,20 @@ async function submit(number, file) {
   const builds = await api(`/v1/builds?filter[app]=${app.id}&filter[version]=${number}&include=buildBetaDetail,preReleaseVersion&limit=10`);
   if (builds.data.length === 0) fail(`no build ${number}`);
   const included = Object.fromEntries((builds.included ?? []).map((i) => [`${i.type}:${i.id}`, i.attributes]));
+  const platformOf = (b) => included[`preReleaseVersions:${b.relationships.preReleaseVersion?.data?.id}`]?.platform ?? "?";
+  const stateOf = (b) => included[`buildBetaDetails:${b.relationships.buildBetaDetail?.data?.id}`]?.externalBuildState;
+  // Every build is checked before anything changes, so a refusal leaves
+  // none of them half sent.
   for (const b of builds.data) {
-    const platform = included[`preReleaseVersions:${b.relationships.preReleaseVersion?.data?.id}`]?.platform ?? "?";
-    const state = included[`buildBetaDetails:${b.relationships.buildBetaDetail?.data?.id}`]?.externalBuildState;
-    if (b.attributes.processingState !== "VALID") fail(`${platform} build ${number} is ${b.attributes.processingState}, not VALID`);
+    if (b.attributes.processingState !== "VALID") fail(`${platformOf(b)} build ${number} is ${b.attributes.processingState}, not VALID`);
+    if (stateOf(b) === "NOT_APPLICABLE") {
+      fail(`${platformOf(b)} build ${number} was archived for internal testing only and can never go external; ` +
+        `set the workflow's archives to "App Store Connect" (see the header) and make a new build`);
+    }
+  }
+  for (const b of builds.data) {
+    const platform = platformOf(b);
+    const state = stateOf(b);
     const localizations = (await api(`/v1/builds/${b.id}/betaBuildLocalizations`)).data;
     const localization = localizations.find((l) => l.attributes.locale === LOCALE);
     if (localization) {
