@@ -37,11 +37,15 @@ final class MediaImages: Sendable {
         init(_ image: CGImage) { self.image = image }
     }
 
-    /// A download and how many callers still wait for it.
+    /// A download, how many callers still wait for it, and its place in
+    /// the queue for a download slot.
     private struct Loading {
         var id: UUID
         var task: Task<Bool, Never>
         var callers: Int
+        /// Each waiting caller's own priority; the queue uses the lowest.
+        var priorities: CallerPriorities
+        var priority: Int { priorities.lowest }
     }
 
     private struct State {
@@ -72,7 +76,8 @@ final class MediaImages: Sendable {
     private static let byteLimit = 20 * 1024 * 1024
     private static let timeout = Duration.seconds(30)
     /// At most this many downloads at once, so a fast scroll past many
-    /// media rows can't hold many bodies in memory together.
+    /// media rows can't hold many bodies in memory together. A free slot
+    /// goes to the waiting download with the lowest priority (#263).
     private let downloads = DownloadSlots(limit: 6)
     private static let log = Logger(subsystem: "dev.bespokebits.influx", category: "Media")
 
@@ -117,13 +122,22 @@ final class MediaImages: Sendable {
     /// request is waiting to be tried again. Cancelling the calling task
     /// stops waiting; once no caller waits, the download itself is
     /// cancelled, and a later call starts it again.
-    func load(_ request: MediaRequest) async -> Bool {
+    ///
+    /// `priority` orders the wait for a download slot: lowest first, so the
+    /// timeline gives the rows on screen 0 and those further off more
+    /// (`RowImageCache`). Every caller keeps its own priority, as `caller`
+    /// (a timeline names itself, so `prioritize` moves its own), and a load
+    /// waits at the lowest of its callers'.
+    func load(_ request: MediaRequest, priority: Int = 0, caller: UUID = UUID()) async -> Bool {
         if image(for: request) != nil { return true }
         let joined = state.withLock { current -> (UUID, Task<Bool, Never>)? in
             if let wait = current.failed.wait(for: request.key, now: .now), wait > .zero { return nil }
             if var entry = current.loading[request.key] {
                 entry.callers += 1
+                let before = entry.priority
+                entry.priorities.add(caller, priority)
                 current.loading[request.key] = entry
+                if entry.priority != before { requeue(request.key) }
                 return (entry.id, entry.task)
             }
             let id = UUID()
@@ -146,24 +160,53 @@ final class MediaImages: Sendable {
                 }
                 return image != nil
             }
-            current.loading[request.key] = Loading(id: id, task: task, callers: 1)
+            var priorities = CallerPriorities()
+            priorities.add(caller, priority)
+            current.loading[request.key] = Loading(id: id, task: task, callers: 1, priorities: priorities)
             return (id, task)
         }
         guard let (id, task) = joined else { return false }
         return await withTaskCancellationHandler {
             await task.value
         } onCancel: {
-            leave(request.key, id: id)
+            leave(request.key, id: id, caller: caller)
+        }
+    }
+
+    /// Moves `caller`'s priority for a download still waiting for a slot.
+    /// The download waits at the lowest of its callers'. Nothing happens
+    /// for one that isn't loading, or that `caller` doesn't wait for.
+    func prioritize(_ key: String, _ priority: Int, caller: UUID) {
+        let moved = state.withLock { current -> Bool in
+            guard var entry = current.loading[key] else { return false }
+            let before = entry.priority
+            guard entry.priorities.move(caller, to: priority) else { return false }
+            current.loading[key] = entry
+            return entry.priority != before
+        }
+        if moved { requeue(key) }
+    }
+
+    /// Tells the slot queue that `key`'s priority changed. The queue reads
+    /// the priority when the update reaches it, not when it was sent, so
+    /// updates that arrive out of order still leave the latest one.
+    private func requeue(_ key: String) {
+        Task { [downloads, state] in
+            await downloads.prioritize(key) { state.withLock { $0.loading[key]?.priority } }
         }
     }
 
     /// One caller of a download stopped waiting; the last one cancels it.
-    private func leave(_ key: String, id: UUID) {
+    private func leave(_ key: String, id: UUID, caller: UUID) {
         let abandoned = state.withLock { current -> Task<Bool, Never>? in
             guard var entry = current.loading[key], entry.id == id else { return nil }
             entry.callers -= 1
             guard entry.callers <= 0 else {
+                // The rest wait at their own priorities.
+                let before = entry.priority
+                entry.priorities.remove(caller)
                 current.loading[key] = entry
+                if entry.priority != before { requeue(key) }
                 return nil
             }
             current.loading[key] = nil
@@ -186,8 +229,11 @@ final class MediaImages: Sendable {
             accountGrants = await self.grants(for: reference)
             accountGrants?.warm(reference)
         }
-        // Cancelled while waiting for a slot: nothing was fetched.
-        guard await downloads.acquire() else { return nil }
+        // Cancelled while waiting for a slot: nothing was fetched. The
+        // priority is read when the wait begins; later moves reach the queue.
+        guard await downloads.acquire(request.key, priority: { [state] in
+            state.withLock { $0.loading[request.key]?.priority ?? 0 }
+        }) else { return nil }
         defer { Task { await downloads.release() } }
         // One byte over the limit tells a cut-off body, which is dropped
         // rather than decoded half way.
@@ -253,23 +299,67 @@ final class MediaImages: Sendable {
     }
 }
 
-/// A counting semaphore for downloads. The newest waiter goes first: after
-/// a fast scroll the newest requests are for the rows now on screen, and
-/// the old ones for rows already scrolled past. A waiter whose task is
-/// cancelled leaves the queue.
-private actor DownloadSlots {
+/// Each caller's priority for one download, and how many times it waits:
+/// the download waits at the lowest (#263), so one caller moving its own
+/// never pushes back another's.
+struct CallerPriorities: Equatable {
+    private var byCaller: [UUID: (priority: Int, count: Int)] = [:]
+
+    static func == (a: Self, b: Self) -> Bool {
+        a.byCaller.mapValues(\.priority) == b.byCaller.mapValues(\.priority)
+    }
+
+    /// The lowest priority of any caller; 0 with none.
+    var lowest: Int { byCaller.values.map(\.priority).min() ?? 0 }
+
+    /// `caller` waits (again) at `priority`.
+    mutating func add(_ caller: UUID, _ priority: Int) {
+        let count = byCaller[caller]?.count ?? 0
+        byCaller[caller] = (priority, count + 1)
+    }
+
+    /// Moves `caller`'s priority; false when it isn't waiting.
+    mutating func move(_ caller: UUID, to priority: Int) -> Bool {
+        guard let entry = byCaller[caller] else { return false }
+        byCaller[caller] = (priority, entry.count)
+        return true
+    }
+
+    /// One of `caller`'s waits ended.
+    mutating func remove(_ caller: UUID) {
+        guard let entry = byCaller[caller] else { return }
+        byCaller[caller] = entry.count > 1 ? (entry.priority, entry.count - 1) : nil
+    }
+}
+
+/// A counting semaphore for downloads. A free slot goes to the waiter with
+/// the lowest priority, and the one that has waited longest among equals
+/// (#263). The timeline asks for the images of the rows ahead nearest
+/// first and keeps their priorities current as the reader scrolls, so the
+/// images about to come on screen load before those of rows further off.
+/// (Until 2026-11, the newest waiter went first, which served the farthest
+/// row's images first.) A waiter whose task is cancelled leaves the queue.
+actor DownloadSlots {
+    private struct Waiter {
+        let id: Int
+        let key: String
+        var priority: Int
+        let continuation: CheckedContinuation<Bool, Never>
+    }
+
     private let limit: Int
     private var used = 0
-    private var waiters: [(id: Int, continuation: CheckedContinuation<Bool, Never>)] = []
+    private var waiters: [Waiter] = []
     private var nextID = 0
 
     init(limit: Int) {
         self.limit = limit
     }
 
-    /// Waits for a slot. False, holding no slot, if the task was cancelled
-    /// before one came free.
-    func acquire() async -> Bool {
+    /// Waits for a slot for the download `key`, at the priority `priority`
+    /// gives when the wait begins. False, holding no slot, if the task was
+    /// cancelled before one came free.
+    func acquire(_ key: String, priority: @Sendable () -> Int) async -> Bool {
         guard !Task.isCancelled else { return false }
         if used < limit {
             used += 1
@@ -277,20 +367,41 @@ private actor DownloadSlots {
         }
         nextID += 1
         let id = nextID
+        let start = priority()
         return await withTaskCancellationHandler {
-            await withCheckedContinuation { waiters.append((id, $0)) }
+            await withCheckedContinuation { waiters.append(Waiter(id: id, key: key, priority: start, continuation: $0)) }
         } onCancel: {
             Task { await self.withdraw(id) }
         }
     }
 
-    func release() {
-        if waiters.isEmpty {
-            used -= 1
-        } else {
-            // The slot passes straight to the newest waiter.
-            waiters.removeLast().continuation.resume(returning: true)
+    /// Moves every waiter for `key` to `priority`.
+    func prioritize(_ key: String, _ priority: Int) {
+        for index in waiters.indices where waiters[index].key == key {
+            waiters[index].priority = priority
         }
+    }
+
+    /// Moves every waiter for `key` to the priority `current` gives now, so
+    /// that updates arriving in any order leave the latest. Nil leaves them.
+    func prioritize(_ key: String, current: @Sendable () -> Int?) {
+        guard let priority = current() else { return }
+        prioritize(key, priority)
+    }
+
+    func release() {
+        guard let next = waiters.indices.min(by: { (waiters[$0].priority, waiters[$0].id) < (waiters[$1].priority, waiters[$1].id) })
+        else {
+            used -= 1
+            return
+        }
+        // The slot passes straight to the next waiter.
+        waiters.remove(at: next).continuation.resume(returning: true)
+    }
+
+    /// The keys waiting, in the order they would get a slot. For tests.
+    var queue: [String] {
+        waiters.sorted { ($0.priority, $0.id) < ($1.priority, $1.id) }.map(\.key)
     }
 
     private func withdraw(_ id: Int) {

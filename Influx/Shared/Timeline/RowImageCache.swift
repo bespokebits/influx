@@ -42,6 +42,7 @@ final class RowImageCache {
     private var waiting: Set<String> = []
     private var generation = 0
     private var lastVisible: Range<Int>?
+    private var lastCount = 0
     /// The content each kept bitmap was drawn from, to draw it again when
     /// its images land.
     private var drawn: [String: (TimelineRow, RowGeometry)] = [:]
@@ -50,6 +51,16 @@ final class RowImageCache {
     /// The load for each request in `awaitingMedia`, cancelled once no kept
     /// row wants it.
     private var mediaLoads: [String: Task<Void, Never>] = [:]
+    /// How far each kept row is from the screen, in the order its images
+    /// should load (`distance`): rows on screen first, then onward in the
+    /// scroll direction, then behind (#263).
+    private var distances: [String: Int] = [:]
+    /// The priority each request in `awaitingMedia` last had: the distance
+    /// of the nearest row that wants it.
+    private var mediaPriorities: [String: Int] = [:]
+    /// Who this cache is to `MediaImages`, so moving its loads moves only
+    /// its own priorities.
+    private let caller = UUID()
     private let media: MediaImages
 
     init(media: MediaImages = .shared) {
@@ -68,6 +79,8 @@ final class RowImageCache {
         mediaLoads.values.forEach { $0.cancel() }
         mediaLoads.removeAll()
         awaitingMedia.removeAll()
+        mediaPriorities.removeAll()
+        distances.removeAll()
         generation += 1
         lastVisible = nil
     }
@@ -102,8 +115,12 @@ final class RowImageCache {
             queued[key] = nil
             waiting.remove(key)
             drawn[key] = nil
+            distances[key] = nil
         }
         stopLoading(for: Set(keys))
+        // The rows around the screen changed, so the next prefetch measures
+        // them again even if the visible range didn't move (#263).
+        lastVisible = nil
     }
 
     /// Bitmaps drawn before the timeline was on screen, for the environment
@@ -136,7 +153,10 @@ final class RowImageCache {
     /// Call when the visible rows change. Evicts far rows and renders the
     /// rows around `visible` that aren't ready, nearest first.
     func prefetch(around visible: Range<Int>, in model: TimelineModel) {
-        guard let environment, model.count > 0, visible != lastVisible else { return }
+        // A changed row count (rows inserted below the screen) is measured
+        // again too, so new rows' images don't wait at the back.
+        guard let environment, model.count > 0, visible != lastVisible || model.count != lastCount else { return }
+        lastCount = model.count
         let down = visible.lowerBound >= (lastVisible?.lowerBound ?? 0)
         lastVisible = visible
         let count = model.count
@@ -155,14 +175,11 @@ final class RowImageCache {
         let above = down ? Self.behind : Self.ahead
         let below = down ? Self.ahead : Self.behind
         let wanted = max(0, visible.lowerBound - above)..<min(count, visible.upperBound + below)
-        // Visible rows first, then onward in the scroll direction, then the
-        // few rows behind.
-        func priority(_ row: Int) -> Int {
-            if down {
-                return row >= visible.lowerBound ? row - visible.lowerBound : Self.ahead * 2 + visible.lowerBound - row
-            }
-            return row < visible.upperBound ? visible.upperBound - 1 - row : Self.ahead * 2 + row - visible.upperBound
-        }
+        func priority(_ row: Int) -> Int { Self.distance(row, visible: visible, down: down) }
+        // Images already waiting move up or down the download queue with
+        // their rows, so the rows coming on screen load first.
+        distances = Dictionary(budgeted.map { (model.rows[$0].mergeKey, priority($0)) }, uniquingKeysWith: min)
+        reprioritizeMedia()
         let jobs = wanted
             .filter { keptKeys.contains(model.rows[$0].mergeKey) }
             .filter { images[model.rows[$0].mergeKey] == nil && queued[model.rows[$0].mergeKey] == nil }
@@ -172,6 +189,29 @@ final class RowImageCache {
 
         let batches = stride(from: 0, to: jobs.count, by: 4).map { Array(jobs[$0..<min($0 + 4, jobs.count)]) }
         render(batches, environment: environment, urgent: false)
+    }
+
+    /// How soon `row`'s images should load: the visible rows first, then
+    /// onward in the scroll direction, then the rows behind. Lower is sooner.
+    static func distance(_ row: Int, visible: Range<Int>, down: Bool) -> Int {
+        if down {
+            return row >= visible.lowerBound ? row - visible.lowerBound : ahead * 2 + visible.lowerBound - row
+        }
+        return row < visible.upperBound ? visible.upperBound - 1 - row : ahead * 2 + row - visible.upperBound
+    }
+
+    /// The priority of a load: its nearest wanting row's distance.
+    private func mediaPriority(_ rows: Set<String>) -> Int {
+        rows.compactMap { distances[$0] }.min() ?? Self.ahead * 4
+    }
+
+    private func reprioritizeMedia() {
+        for (request, rows) in awaitingMedia {
+            let priority = mediaPriority(rows)
+            guard mediaPriorities[request] != priority else { continue }
+            mediaPriorities[request] = priority
+            media.prioritize(request, priority, caller: caller)
+        }
     }
 
     /// The rows to keep bitmaps for, in the order they are wanted: the
@@ -240,14 +280,24 @@ final class RowImageCache {
         for request in rendered.missing {
             let alreadyLoading = awaitingMedia[request.key] != nil
             awaitingMedia[request.key, default: []].insert(rendered.key)
-            guard !alreadyLoading else { continue }
+            let priority = mediaPriority(awaitingMedia[request.key] ?? [])
+            guard !alreadyLoading else {
+                // A nearer row now wants it too.
+                if let last = mediaPriorities[request.key], priority < last {
+                    mediaPriorities[request.key] = priority
+                    media.prioritize(request.key, priority, caller: caller)
+                }
+                continue
+            }
+            mediaPriorities[request.key] = priority
             let generation = self.generation
             // Held weakly, so a cache that is let go while an image keeps
             // failing stops trying after its current wait.
-            mediaLoads[request.key] = Task { [weak self, media = self.media] in
+            mediaLoads[request.key] = Task { [weak self, media = self.media, caller = self.caller] in
                 var drewFailure = false
                 while true {
-                    let loaded = await media.load(request)
+                    let priority = self?.mediaPriorities[request.key] ?? priority
+                    let loaded = await media.load(request, priority: priority, caller: caller)
                     guard let wait = self?.landed(request, loaded: loaded, generation: generation, drewFailure: &drewFailure)
                     else { return }
                     try? await Task.sleep(for: max(wait, .milliseconds(100)))
@@ -269,6 +319,7 @@ final class RowImageCache {
             return wait
         }
         mediaLoads[request.key] = nil
+        mediaPriorities[request.key] = nil
         guard let keys = awaitingMedia.removeValue(forKey: request.key) else { return nil }
         if loaded || media.hasFailed(request) { redraw(keys) }
         return nil
@@ -283,6 +334,7 @@ final class RowImageCache {
             let remaining = rows.subtracting(keys)
             if remaining.isEmpty {
                 awaitingMedia[request] = nil
+                mediaPriorities[request] = nil
                 mediaLoads.removeValue(forKey: request)?.cancel()
             } else {
                 awaitingMedia[request] = remaining
