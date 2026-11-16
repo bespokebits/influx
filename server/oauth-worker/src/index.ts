@@ -188,13 +188,13 @@ export const SMOKE_AGENT = "influx-deploy-check";
  * attestation is required can tell real installs from deploys (ADR 0033).
  * The smoke check names itself, and the app sends URLSession's default
  * User-Agent, "<bundle name>/<build> CFNetwork/…". Anyone can send either,
- * so it is used for nothing but the count. The names are a fixed set of six,
+ * so it is used for nothing but the count. The names are a fixed set of seven,
  * with no build number, so a caller cannot fill the day's events with names.
  */
 export function unattestedSource(request: Request): string {
   const agent = request.headers.get("User-Agent") ?? "";
   if (agent === SMOKE_AGENT) return "unattested: deploy check";
-  const app = /^Influx(%20(?:Dev|Test|Perf))?\/\d+ CFNetwork\//.exec(agent);
+  const app = /^Influx(%20(?:Dev|Test|Perf|Preview))?\/\d+ CFNetwork\//.exec(agent);
   if (!app) return "unattested: other";
   return `unattested: Influx${app[1] ? ` ${app[1].slice(3)}` : ""}`;
 }

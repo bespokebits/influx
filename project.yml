@@ -9,6 +9,7 @@ configs:
   Debug: debug
   Test: debug
   Release: release
+  Preview: release
   Perf: release
 
 # DEVELOPMENT_TEAM lives in Configs/DevelopmentTeam.xcconfig so a collaborator
@@ -18,10 +19,13 @@ configFiles:
   Debug: Configs/Base.xcconfig
   Test: Configs/Base.xcconfig
   Release: Configs/Base.xcconfig
+  Preview: Configs/Base.xcconfig
   Perf: Configs/Base.xcconfig
 
 # Each configuration has its own bundle ID, so a dev or UI-test build never
 # shares data, keychain items or iCloud containers with the production app.
+# Preview is the one that does share, on purpose (ADR 0042): it installs
+# beside the production app and syncs with it.
 #
 # The app was dev.bespokebits.flux until the rename (ADR 0032). Its sign-ins
 # sit in the old app's keychain group, so the builds that had them list that
@@ -39,11 +43,17 @@ settings:
     # its target has MARKETING_VERSION. Xcode Cloud sets the build number.
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
+    INFLUX_APP_ICON: AppIcon
+    # Where an app that shares another's keychain group keeps the sign-ins
+    # that must stay its own (Preview, below). Empty everywhere else.
+    INFLUX_OWN_CREDENTIAL_SERVICE: ""
   configs:
     Debug:
       INFLUX_BUNDLE_IDENTIFIER: dev.bespokebits.influx.dev
       INFLUX_PRODUCT_NAME: "Influx Dev"
       INFLUX_DISPLAY_NAME: "Influx Dev"
+      # The app's first keychain group, where a new sign-in goes: its own.
+      INFLUX_KEYCHAIN_GROUP: dev.bespokebits.influx.dev
       INFLUX_CLOUDKIT_CONTAINER: ""
       INFLUX_IOS_ENTITLEMENTS: ""
       INFLUX_MAC_ENTITLEMENTS: ""
@@ -72,6 +82,7 @@ settings:
       INFLUX_BUNDLE_IDENTIFIER: dev.bespokebits.influx
       INFLUX_PRODUCT_NAME: Influx
       INFLUX_DISPLAY_NAME: Influx
+      INFLUX_KEYCHAIN_GROUP: dev.bespokebits.influx
       # iCloud sync. Release is the one build that syncs. Debug and Test
       # sign without the iCloud entitlement, so a dev or UI-test run never
       # touches the reader's iCloud data. Sync is off wherever INFLUX_CLOUDKIT_CONTAINER
@@ -98,6 +109,32 @@ settings:
       # has no such rule and keeps CloudKit out of launch.
       INFLUX_MAC_CLOUDKIT_LDFLAGS: -framework CloudKit
       INFLUX_LEGACY_KEYCHAIN_GROUP: dev.bespokebits.flux
+      INFLUX_APP_ATTEST_ENVIRONMENT: production
+    # The app development builds ship as, to internal testers only, so the
+    # production app stays on the build public testers have (ADR 0042). It
+    # installs beside the production app under its own bundle ID, and is
+    # otherwise a Release build that shares the reader's data with it:
+    #
+    # - the same iCloud container, so feeds, saved views and the reading
+    #   place sync between the two apps as they do between two devices;
+    # - the production app's keychain group as its first, so Mastodon and
+    #   Sammy sign-ins, whose tokens never rotate, are found there, and one
+    #   made here goes there. Its Bluesky sign-ins sit there too, but under
+    #   INFLUX_OWN_CREDENTIAL_SERVICE, where the production app never looks:
+    #   two apps spending one Bluesky session end it for both (ADR 0017).
+    Preview:
+      INFLUX_BUNDLE_IDENTIFIER: dev.bespokebits.influx.preview
+      INFLUX_PRODUCT_NAME: "Influx Preview"
+      INFLUX_DISPLAY_NAME: "Influx Preview"
+      INFLUX_APP_ICON: AppIconPreview
+      INFLUX_CLOUDKIT_CONTAINER: iCloud.dev.bespokebits.influx
+      INFLUX_CLOUDKIT_ENVIRONMENT: Production
+      INFLUX_IOS_ENTITLEMENTS: .icloud
+      INFLUX_MAC_ENTITLEMENTS: .icloud
+      INFLUX_MAC_CLOUDKIT_LDFLAGS: -framework CloudKit
+      INFLUX_KEYCHAIN_GROUP: dev.bespokebits.influx
+      INFLUX_LEGACY_KEYCHAIN_GROUP: dev.bespokebits.flux
+      INFLUX_OWN_CREDENTIAL_SERVICE: dev.bespokebits.influx.preview.credentials
       INFLUX_APP_ATTEST_ENVIRONMENT: production
     # Release's optimisation under its own bundle ID, for performance runs.
     # Hitch numbers need a release build, but a Release build would replace
@@ -157,7 +194,7 @@ targets:
         # The file name (Influx.app, Influx Dev.app, Influx Test.app). Users
         # see INFLUX_DISPLAY_NAME (CFBundleDisplayName and CFBundleName below).
         PRODUCT_NAME: $(INFLUX_PRODUCT_NAME)
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_APPICON_NAME: $(INFLUX_APP_ICON)
         PRODUCT_MODULE_NAME: Influx
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
@@ -178,6 +215,8 @@ targets:
         InfluxCommit: $(INFLUX_COMMIT)
         # The iCloud container sync uses, empty where sync is off.
         InfluxCloudKitContainer: $(INFLUX_CLOUDKIT_CONTAINER)
+        # See INFLUX_OWN_CREDENTIAL_SERVICE above.
+        InfluxOwnCredentialService: $(INFLUX_OWN_CREDENTIAL_SERVICE)
         # The link back to an item (ItemLink): dev.bespokebits.influx://item?ref=…
         # Each build registers its own bundle ID, so only the App Store build
         # takes dev.bespokebits.influx and a dev build never takes its links.
@@ -244,7 +283,7 @@ targets:
         # The file name (Influx.app, Influx Dev.app, Influx Test.app). Users
         # see INFLUX_DISPLAY_NAME (CFBundleDisplayName and CFBundleName below).
         PRODUCT_NAME: $(INFLUX_PRODUCT_NAME)
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_APPICON_NAME: $(INFLUX_APP_ICON)
         PRODUCT_MODULE_NAME: Influx
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_ENTITLEMENTS: Influx/macOS/Influx$(INFLUX_MAC_ENTITLEMENTS).entitlements
@@ -263,6 +302,8 @@ targets:
         InfluxCommit: $(INFLUX_COMMIT)
         # The iCloud container sync uses, empty where sync is off.
         InfluxCloudKitContainer: $(INFLUX_CLOUDKIT_CONTAINER)
+        # See INFLUX_OWN_CREDENTIAL_SERVICE above.
+        InfluxOwnCredentialService: $(INFLUX_OWN_CREDENTIAL_SERVICE)
         # The link back to an item; see the iOS target.
         CFBundleURLTypes:
           - CFBundleURLName: $(INFLUX_BUNDLE_IDENTIFIER)
@@ -493,6 +534,26 @@ schemes:
         - InfluxTests-macOS
     archive:
       config: Release
+
+  # Influx Preview (the Preview configuration above): the same targets,
+  # archived under the Preview bundle ID for internal testers.
+  InfluxPreview-iOS:
+    build:
+      targets:
+        Influx-iOS: all
+    run:
+      config: Preview
+    archive:
+      config: Preview
+
+  InfluxPreview-macOS:
+    build:
+      targets:
+        Influx-macOS: all
+    run:
+      config: Preview
+    archive:
+      config: Preview
 
   InfluxUITests-iOS:
     build:

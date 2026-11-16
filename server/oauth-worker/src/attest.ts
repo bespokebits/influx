@@ -56,10 +56,13 @@ export const MACOS_ACL_BLOB = fromBase64("MEAMAjExMDowCQwCb2uhAwEB/zAJDAJvYaEDAQ
 
 /**
  * The bundle IDs it attests, and which App Attest environment each signs
- * in: the release app in production, the debug app in development.
+ * in: the release app and Influx Preview, which ships to internal testers
+ * through TestFlight (ADR 0042), in production; the debug app in
+ * development.
  */
 export const ATTESTED_APPS: Readonly<Record<string, "production" | "development">> = {
   "dev.bespokebits.influx": "production",
+  "dev.bespokebits.influx.preview": "production",
   "dev.bespokebits.influx.dev": "development",
 };
 

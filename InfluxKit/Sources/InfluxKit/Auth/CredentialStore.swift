@@ -54,6 +54,49 @@ public final class InMemoryCredentialStore: CredentialStore {
     }
 }
 
+/// Credentials kept in two stores, by account: for an app that shares
+/// another app's sign-ins but must keep some to itself (ADR 0042).
+///
+/// Influx Preview reads the production app's keychain group, so the two apps
+/// share the sign-ins whose tokens never rotate. A Bluesky session can't be
+/// shared: its refresh tokens are single-use, and a second app spending one
+/// ends the session for both (ADR 0017). So those accounts go to `own`, a
+/// store the other app never reads, and each app signs them in by itself.
+public struct RoutedCredentialStore: CredentialStore {
+    public let shared: any CredentialStore
+    public let own: any CredentialStore
+    /// Whether an account's credentials are the shared store's.
+    public let isShared: @Sendable (String) -> Bool
+
+    public init(shared: any CredentialStore, own: any CredentialStore, isShared: @escaping @Sendable (String) -> Bool) {
+        self.shared = shared
+        self.own = own
+        self.isShared = isShared
+    }
+
+    private func store(for account: String) -> any CredentialStore {
+        isShared(account) ? shared : own
+    }
+
+    public func data(for account: String) throws -> Data? {
+        try store(for: account).data(for: account)
+    }
+
+    public func setData(_ data: Data, for account: String) throws {
+        try store(for: account).setData(data, for: account)
+    }
+
+    public func deleteData(for account: String) throws {
+        try store(for: account).deleteData(for: account)
+    }
+
+    /// Each store's accounts, without the ones that are the other's: the
+    /// shared store also lists what the other app keeps to itself there.
+    public func accounts() throws -> [String] {
+        try shared.accounts().filter(isShared) + own.accounts().filter { !isShared($0) }
+    }
+}
+
 #if canImport(Security)
 /// Credentials in the keychain, as generic passwords under one service.
 ///

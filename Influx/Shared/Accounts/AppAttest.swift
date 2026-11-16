@@ -40,9 +40,12 @@ extension CallerAttestation {
     /// Worker hosts keep one key store), so all its requests take turns
     /// with one key. The key ID stays in this device's keychain, apart
     /// from sign-ins and never in iCloud: the key can't leave the device.
+    /// It is kept under the app's own bundle ID, because a key works only
+    /// in the app that made it, and Influx Preview reads the production
+    /// app's keychain group (ADR 0042).
     static let app: CallerAttestation = {
         #if canImport(Security)
-        let keys: any CredentialStore = KeychainCredentialStore(service: "dev.bespokebits.influx.app-attest")
+        let keys: any CredentialStore = KeychainCredentialStore(service: keyService(bundleID: Bundle.main.bundleIdentifier))
         #else
         let keys: any CredentialStore = InMemoryCredentialStore()
         #endif
@@ -56,4 +59,10 @@ extension CallerAttestation {
             platform: platform, appID: Bundle.main.bundleIdentifier ?? ""
         )
     }()
+
+    /// The keychain service an app keeps its key ID under. The production
+    /// app's is what it has always been.
+    static func keyService(bundleID: String?) -> String {
+        "\(bundleID ?? "dev.bespokebits.influx").app-attest"
+    }
 }

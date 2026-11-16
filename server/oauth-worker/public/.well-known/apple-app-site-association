@@ -2,12 +2,12 @@
   "applinks": {
     "details": [
       {
-        "appIDs": ["KV99MN4F58.dev.bespokebits.influx", "KV99MN4F58.dev.bespokebits.influx.dev", "KV99MN4F58.dev.bespokebits.influx.uitest", "KV99MN4F58.dev.bespokebits.flux", "KV99MN4F58.dev.bespokebits.flux.dev", "KV99MN4F58.dev.bespokebits.flux.uitest"],
+        "appIDs": ["KV99MN4F58.dev.bespokebits.influx", "KV99MN4F58.dev.bespokebits.influx.preview", "KV99MN4F58.dev.bespokebits.influx.dev", "KV99MN4F58.dev.bespokebits.influx.uitest", "KV99MN4F58.dev.bespokebits.flux", "KV99MN4F58.dev.bespokebits.flux.dev", "KV99MN4F58.dev.bespokebits.flux.uitest"],
         "components": [{ "/": "/oauth/callback", "comment": "Bluesky sign-in" }]
       }
     ]
   },
   "webcredentials": {
-    "apps": ["KV99MN4F58.dev.bespokebits.influx", "KV99MN4F58.dev.bespokebits.influx.dev", "KV99MN4F58.dev.bespokebits.influx.uitest", "KV99MN4F58.dev.bespokebits.flux", "KV99MN4F58.dev.bespokebits.flux.dev", "KV99MN4F58.dev.bespokebits.flux.uitest"]
+    "apps": ["KV99MN4F58.dev.bespokebits.influx", "KV99MN4F58.dev.bespokebits.influx.preview", "KV99MN4F58.dev.bespokebits.influx.dev", "KV99MN4F58.dev.bespokebits.influx.uitest", "KV99MN4F58.dev.bespokebits.flux", "KV99MN4F58.dev.bespokebits.flux.dev", "KV99MN4F58.dev.bespokebits.flux.uitest"]
   }
 }

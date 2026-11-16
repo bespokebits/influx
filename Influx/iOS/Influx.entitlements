@@ -11,7 +11,7 @@
 	<string>$(INFLUX_APP_ATTEST_ENVIRONMENT)</string>
 	<key>keychain-access-groups</key>
 	<array>
-		<string>$(AppIdentifierPrefix)$(INFLUX_BUNDLE_IDENTIFIER)</string>
+		<string>$(AppIdentifierPrefix)$(INFLUX_KEYCHAIN_GROUP)</string>
 		<string>$(AppIdentifierPrefix)$(INFLUX_LEGACY_KEYCHAIN_GROUP)</string>
 	</array>
 </dict>

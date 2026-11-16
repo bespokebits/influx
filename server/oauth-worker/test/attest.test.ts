@@ -19,6 +19,7 @@ import {
   cbor,
   concat,
   DEBUG,
+  PREVIEW,
   ecKeys,
   enc,
   makeAssertion,
@@ -339,10 +340,13 @@ test("each attestation check fails on its own", async () => {
 test("an attestation's launch category must suit the app", async () => {
   const release = (category: number | null) => input({ challenge: CHALLENGE, launch: { category } });
   const debug = (category: number | null) => input({ challenge: CHALLENGE, bundle: DEBUG, launch: { category } });
-  // The release app comes from TestFlight or the App Store; the debug app is development-signed.
-  for (const made of [release(2), release(4), debug(3)]) await verifyAttestation(await made, pki.roots);
+  const preview = (category: number | null) => input({ challenge: CHALLENGE, bundle: PREVIEW, launch: { category } });
+  // The release app comes from TestFlight or the App Store, as Influx
+  // Preview does; the debug app is development-signed.
+  for (const made of [release(2), release(4), preview(2), debug(3)]) await verifyAttestation(await made, pki.roots);
   for (const [label, made] of [
     ["release, development-signed", release(3)],
+    ["preview, development-signed", preview(3)],
     ["release, category 1", release(1)],
     ["release, no category", release(null)],
     ["debug, TestFlight", debug(2)],
@@ -409,6 +413,7 @@ test("registration checks the launch context and stores it", async () => {
   const record = keys.storage(keyId).map.get("key") as { category: number; bundleVersion: string };
   assert.deepEqual([record.category, record.bundleVersion], [4, "0.3.1"]);
   assert.equal((await register(DEBUG, { category: 3 })).status, 201);
+  assert.equal((await register(PREVIEW, { category: 2, bundleVersion: "0.3.1" })).status, 201);
   // A build it doesn't accept is refused for good: a new key won't help.
   for (const [bundle, launch] of [
     [RELEASE, { category: 3 }],

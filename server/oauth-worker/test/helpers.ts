@@ -149,6 +149,7 @@ export function cbor(value: unknown): Uint8Array {
 export const TEAM = "TEAMID1234";
 export const RELEASE = "dev.bespokebits.influx";
 export const DEBUG = "dev.bespokebits.influx.dev";
+export const PREVIEW = "dev.bespokebits.influx.preview";
 export const AAGUID_PRODUCTION = concat(enc.encode("appattest"), new Uint8Array(7));
 export const AAGUID_DEVELOPMENT = enc.encode("appattestdevelop");
 

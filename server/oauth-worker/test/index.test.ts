@@ -279,6 +279,8 @@ test("the published AASA file is its template with the team filled in, for both 
   for (const prefix of ["dev.bespokebits.influx", "dev.bespokebits.flux"]) {
     for (const suffix of ["", ".dev", ".uitest"]) assert.ok(bundles.includes(prefix + suffix), prefix + suffix);
   }
+  // Influx Preview signs in to Bluesky by the same callback (ADR 0042).
+  assert.ok(bundles.includes("dev.bespokebits.influx.preview"));
   assert.deepEqual(published.webcredentials.apps, published.applinks.details[0].appIDs);
 });
 
@@ -317,6 +319,7 @@ test("unattested requests are counted by where they came from", () => {
   assert.equal(from("Influx/3 CFNetwork/3860.100.1 Darwin/27.2.0"), "unattested: Influx");
   assert.equal(from("Influx/1234567 CFNetwork/3860.100.1 Darwin/27.2.0"), "unattested: Influx");
   assert.equal(from("Influx%20Dev/1 CFNetwork/3860.100.1 Darwin/27.2.0"), "unattested: Influx Dev");
+  assert.equal(from("Influx%20Preview/7 CFNetwork/3860.100.1 Darwin/27.2.0"), "unattested: Influx Preview");
   // Anything else, however it names itself, is one bucket, so a caller cannot fill the day's events.
   assert.equal(from("Influx%20Evil/3 CFNetwork/1"), "unattested: other");
   assert.equal(from("curl/8.0"), "unattested: other");

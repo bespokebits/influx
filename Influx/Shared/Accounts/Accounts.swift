@@ -132,9 +132,7 @@ final class Accounts {
         // Mastodon and Sammy sign-ins sync: their tokens never rotate
         // (ADR 0023). Bluesky refresh tokens do, and two devices sharing one
         // would end it for both, so each device signs those in itself.
-        let credentials = credentials ?? (isSample ? InMemoryCredentialStore() : KeychainCredentialStore(
-            synchronizes: Sync.containerID != nil, syncsAccount: { Accounts.syncsCredentials($0) }
-        ))
+        let credentials = credentials ?? (isSample ? InMemoryCredentialStore() : Self.keychain())
         #else
         let credentials = credentials ?? InMemoryCredentialStore()
         #endif
@@ -817,6 +815,24 @@ final class Accounts {
         }
         return String(account.id.split(separator: "@").last ?? "")
     }
+
+    #if canImport(Security)
+    /// The app's sign-ins in the keychain. An app that shares another's
+    /// keychain group (Influx Preview, ADR 0042) names a service of its own
+    /// in Info.plist, and keeps there, on this device, the sign-ins that
+    /// don't sync: the other app never reads that service, so the two never
+    /// spend one Bluesky session. The sign-ins that sync stay where both
+    /// apps find them.
+    static func keychain(
+        ownService: String? = (Bundle.main.object(forInfoDictionaryKey: "InfluxOwnCredentialService") as? String)?.nilIfBlank
+    ) -> any CredentialStore {
+        let shared = KeychainCredentialStore(synchronizes: Sync.containerID != nil, syncsAccount: { Accounts.syncsCredentials($0) })
+        guard let ownService else { return shared }
+        return RoutedCredentialStore(
+            shared: shared, own: KeychainCredentialStore(service: ownService), isShared: { Accounts.syncsCredentials($0) }
+        )
+    }
+    #endif
 
     /// Mastodon accounts are `@user@instance`; Bluesky's are DIDs and
     /// Sammy's `<subject>@<host>`.
