@@ -27,54 +27,81 @@ enum RowText {
         return text
     }
 
-    /// The header shows when the row's item was posted, or boosted for a
-    /// boost, whose context line carries the original time. A row that
-    /// arrived late can sit below its own time's place (ADR 0041): it still
-    /// shows its own time, then an arrow and the time where it sits, in the
-    /// late colour (#261): "Sun 5:11 PM → 5:19 PM".
-    /// `withReceived` false leaves the received time out, for a header
-    /// too narrow to hold it: it then takes a line of its own
-    /// (`receivedLine`).
-    static func time(_ row: TimelineRow, _ type: Typography, withReceived: Bool = true) -> NSAttributedString {
-        let posted = shownDate(row)
-        let text = NSMutableAttributedString(string: " · \(posted.formatted(.dateTime.weekday(.abbreviated).hour().minute()))",
+    /// The header shows when the row's post was written. A boosted post
+    /// then shows a rocket and when it was boosted (#270): "Sun 8:46 PM
+    /// 🚀 9:58 PM". A row that arrived late can sit below its own time's
+    /// place (ADR 0041): it then shows an arrow and the time where it sits,
+    /// in the late colour (#261): "Sun 5:11 PM → 5:19 PM".
+    /// `withLater` false leaves the boost and received times out, for a
+    /// header too narrow to hold them: they then take a line of their own
+    /// (`laterLine`).
+    static func time(_ row: TimelineRow, _ type: Typography, withLater: Bool = true) -> NSAttributedString {
+        let text = NSMutableAttributedString(string: " · \(shownDate(row).formatted(.dateTime.weekday(.abbreviated).hour().minute()))",
                                              attributes: attributes(type.meta, Broadsheet.ink2, singleLine: true))
-        if withReceived, let received = receivedDate(row) {
-            text.append(NSAttributedString(string: " → \(receivedText(received, posted: posted))",
-                                           attributes: attributes(type.meta, Broadsheet.late, singleLine: true)))
+        if withLater, let later = later(row, type, singleLine: true) {
+            text.append(NSAttributedString(string: " ", attributes: attributes(type.meta, Broadsheet.ink2, singleLine: true)))
+            text.append(later)
         }
         return text
     }
 
-    /// A late row's received time on a line of its own, under the header:
-    /// "→ 5:19 PM". Nil for a row that sits at its own time.
-    static func receivedLine(_ row: TimelineRow, _ type: Typography) -> NSAttributedString? {
-        guard let received = receivedDate(row) else { return nil }
-        return NSAttributedString(string: "→ \(receivedText(received, posted: shownDate(row)))",
-                                  attributes: attributes(type.meta, Broadsheet.late))
+    /// The boost and received times on a line of their own, under the
+    /// header: "🚀 9:58 PM", "→ 5:19 PM" or both. Nil for a row that has
+    /// neither.
+    static func laterLine(_ row: TimelineRow, _ type: Typography) -> NSAttributedString? {
+        later(row, type, singleLine: false)
+    }
+
+    private static func later(_ row: TimelineRow, _ type: Typography, singleLine: Bool) -> NSAttributedString? {
+        let boosted = boostDate(row), received = receivedDate(row)
+        guard boosted != nil || received != nil else { return nil }
+        let text = NSMutableAttributedString()
+        var previous = shownDate(row)
+        if let boosted {
+            text.append(NSAttributedString(string: "🚀 \(laterText(boosted, after: previous))",
+                                           attributes: attributes(type.meta, Broadsheet.ink2, singleLine: singleLine)))
+            previous = boosted
+        }
+        if let received {
+            text.append(NSAttributedString(string: "\(boosted == nil ? "" : " ")→ \(laterText(received, after: previous))",
+                                           attributes: attributes(type.meta, Broadsheet.late, singleLine: singleLine)))
+        }
+        return text
+    }
+
+    /// When a boosted post was boosted, for one boosted at least a minute
+    /// after it was written; nil for any other row.
+    static func boostDate(_ row: TimelineRow) -> Date? {
+        guard !row.boostedBy.isEmpty, let boosted = row.boostedAt ?? row.postedAt,
+              boosted.timeIntervalSince(shownDate(row)) >= 60 else { return nil }
+        return boosted
     }
 
     /// Where a row that arrived late sits, for one placed at least a
-    /// minute after its own time: below the reader's line (ADR 0041), where
-    /// another device placed it, or where an earlier copy of the post put
-    /// it. Nil for a row that sits at its own time.
+    /// minute after its own time, or after its boost for a boosted post:
+    /// below the reader's line (ADR 0041), where another device placed it,
+    /// or where an earlier copy of the post put it. Nil for a row that sits
+    /// at its own time.
     static func receivedDate(_ row: TimelineRow) -> Date? {
-        guard let posted = row.postedAt, row.sortDate.timeIntervalSince(posted) >= 60 else { return nil }
+        let own = row.boostedBy.isEmpty ? row.postedAt : (row.boostedAt ?? row.postedAt)
+        guard let own, row.sortDate.timeIntervalSince(own) >= 60 else { return nil }
         return row.sortDate
     }
 
-    /// The received time, with its day only when that differs from the
-    /// posted time's.
-    static func receivedText(_ received: Date, posted: Date) -> String {
-        Calendar.current.isDate(received, inSameDayAs: posted)
-            ? received.formatted(.dateTime.hour().minute())
-            : received.formatted(.dateTime.weekday(.abbreviated).hour().minute())
+    /// A later time, with its day only when that differs from the time
+    /// before it.
+    static func laterText(_ later: Date, after earlier: Date) -> String {
+        Calendar.current.isDate(later, inSameDayAs: earlier)
+            ? later.formatted(.dateTime.hour().minute())
+            : later.formatted(.dateTime.weekday(.abbreviated).hour().minute())
     }
 
-    /// The time a row shows: its item's own, or where it sits for a row
-    /// read before that was stored.
+    /// The time a row shows: when its post was written, which for a boost
+    /// is the boosted post's own time; or where it sits for a row read
+    /// before that was stored.
     static func shownDate(_ row: TimelineRow) -> Date {
-        row.postedAt ?? row.sortDate
+        guard let posted = row.postedAt else { return row.sortDate }
+        return row.boostedBy.isEmpty ? posted : min(row.publishedAt, posted)
     }
 
     /// The handle on a line of its own, for when it doesn't fit beside the
@@ -98,7 +125,7 @@ enum RowText {
     }
 
     /// "Boosted by …" or "Replying to …", or nil when the row has neither.
-    /// It wraps rather than cut off the time a boosted post was written.
+    /// The boost's time is in the header (`time`).
     static func context(_ row: TimelineRow, _ type: Typography) -> NSAttributedString? {
         guard let line = contextLine(row) else { return nil }
         return NSAttributedString(string: line, attributes: attributes(type.meta, Broadsheet.ink2))
@@ -116,15 +143,7 @@ enum RowText {
         default:
             "Boosted by \(row.boostedBy[0]) and \(row.boostedBy.count - 1) others"
         }
-        guard let posted = postedTime(row) else { return boosters }
-        return "\(boosters) · posted \(posted)"
-    }
-
-    /// When a boosted post was first written, if that's not when its row
-    /// sits; nil when the two are within a minute.
-    static func postedTime(_ row: TimelineRow) -> String? {
-        guard !row.boostedBy.isEmpty, abs(shownDate(row).timeIntervalSince(row.publishedAt)) >= 60 else { return nil }
-        return row.publishedAt.formatted(.dateTime.month(.abbreviated).day().hour().minute())
+        return boosters
     }
 
     /// What VoiceOver reads for a row, since its text is only in a bitmap.
@@ -144,11 +163,14 @@ enum RowText {
         }
         parts += row.media.map(mediaLabel)
         let posted = shownDate(row)
-        if let received = receivedDate(row) {
-            parts.append("Posted \(posted.formatted(date: .abbreviated, time: .shortened)), received \(receivedText(received, posted: posted))")
-        } else {
-            parts.append(posted.formatted(date: .abbreviated, time: .shortened))
+        var times = [posted.formatted(date: .abbreviated, time: .shortened)]
+        var previous = posted
+        if let boosted = boostDate(row) {
+            times.append("boosted \(laterText(boosted, after: previous))")
+            previous = boosted
         }
+        if let received = receivedDate(row) { times.append("received \(laterText(received, after: previous))") }
+        parts.append(times.count == 1 ? times[0] : "Posted " + times.joined(separator: ", "))
         if let viewer = row.viewer {
             let state = [viewer.liked ? "Liked" : nil, viewer.boosted ? "Boosted" : nil, viewer.bookmarked ? "Bookmarked" : nil].compactMap { $0 }
             if !state.isEmpty { parts.append(state.joined(separator: ", ")) }

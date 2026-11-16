@@ -326,10 +326,10 @@ import InfluxKit
         #expect(geometry.handle != nil)
     }
 
-    /// "Boosted by … · posted …" wraps rather than losing the time.
+    /// A "Boosted by …" line too long for one line wraps rather than being cut.
     @Test func aLongBoostLineWraps() async throws {
         var item = post()
-        item.boostedBy = "Somebody With A Rather Long Display Name"
+        item.boostedBy = String(repeating: "Somebody With A Rather Long Display Name ", count: 3)
         item.boostedByAvatar = "https://cdn.example/b.png"
         item.sortDate = item.publishedAt.addingTimeInterval(86_400)
         let geometry = RowLayout.geometry(for: try await row(item), in: environment)

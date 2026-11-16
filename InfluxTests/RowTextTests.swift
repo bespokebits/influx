@@ -3,8 +3,8 @@ import Testing
 import InfluxKit
 @testable import Influx
 
-/// A boost sits at the time it was boosted, so its header shows that time
-/// and its context line says when the post was written.
+/// A boost sits at the time it was boosted. Its header shows when the post
+/// was written, then a rocket and when it was boosted (#270).
 @Suite struct RowTextTimes {
     private let written = Date(timeIntervalSince1970: 1_800_000_000)
     private let boosted = Date(timeIntervalSince1970: 1_800_090_000)
@@ -20,12 +20,13 @@ import InfluxKit
         return try #require(try await store.rows().first)
     }
 
-    @Test func boostShowsBoostTimeAndWhenItWasPosted() async throws {
+    @Test func boostShowsWhenItWasPostedThenBoosted() async throws {
         let row = try await row(boostedBy: "Ben", sortDate: boosted)
         let header = RowText.header(row, Typography(scale: 1)).string
-        #expect(header.hasSuffix(boosted.formatted(.dateTime.weekday(.abbreviated).hour().minute())))
-        let posted = written.formatted(.dateTime.month(.abbreviated).day().hour().minute())
-        #expect(RowText.contextLine(row) == "Boosted by Ben · posted \(posted)")
+        let day = Date.FormatStyle.dateTime.weekday(.abbreviated).hour().minute()
+        #expect(header.hasSuffix("\(written.formatted(day)) 🚀 \(boosted.formatted(day))"))
+        #expect(!header.contains("→"))
+        #expect(RowText.contextLine(row) == "Boosted by Ben")
     }
 
     @Test func plainPostShowsWhenItWasWritten() async throws {
@@ -56,7 +57,7 @@ import InfluxKit
         #expect(late.body == "late")
         #expect(late.sortDate > read.sortDate)
         let header = RowText.header(late, Typography(scale: 1)).string
-        let received = RowText.receivedText(late.sortDate, posted: written)
+        let received = RowText.laterText(late.sortDate, after: written)
         #expect(header.hasSuffix("\(written.formatted(.dateTime.weekday(.abbreviated).hour().minute())) → \(received)"))
     }
 }

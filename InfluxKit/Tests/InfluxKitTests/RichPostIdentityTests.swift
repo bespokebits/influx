@@ -684,6 +684,7 @@ private struct Pair {
         #expect(rows.count == 1)
         #expect(rows.first?.sourceID == rich.id)
         #expect(rows.first?.mergeKey == Self.originalURI)
+        try Self.expectOneBoostAtItsTime(rows.first)
     }
 
     @Test func theRichRepostFirstThenTheStreamedBoost() async throws {
@@ -695,6 +696,19 @@ private struct Pair {
         #expect(rows.count == 1)
         #expect(rows.first?.sourceID == rich.id)
         #expect(rows.first?.mergeKey == richKey)
+        try Self.expectOneBoostAtItsTime(rows.first)
+    }
+
+    /// The booster is named once, and the boost dated by the bridged copy:
+    /// the rich repost carries only the original's date (#270).
+    private static func expectOneBoostAtItsTime(_ row: TimelineRow?) throws {
+        let row = try #require(row)
+        #expect(row.boostedBy == ["Booster"])
+        let format = ISO8601DateFormatter()
+        format.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let boosted = try #require(format.date(from: reposted))
+        let at = try #require(row.boostedAt)
+        #expect(abs(at.timeIntervalSince(boosted)) < 0.01)
     }
 }
 

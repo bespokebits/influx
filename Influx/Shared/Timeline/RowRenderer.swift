@@ -73,8 +73,8 @@ enum RowRenderer {
         fill(CGRect(x: 0, y: 0, width: geometry.width, height: geometry.height), Broadsheet.paper)
         fill(geometry.dot, sourceColor, oval: true)
         text(RowText.headerName(row, type, withHandle: geometry.handle == nil), in: geometry.header)
-        text(RowText.time(row, type, withReceived: geometry.received == nil), in: geometry.time)
-        if let frame = geometry.received { text(RowText.receivedLine(row, type), in: frame) }
+        text(RowText.time(row, type, withLater: geometry.later == nil), in: geometry.time)
+        if let frame = geometry.later { text(RowText.laterLine(row, type), in: frame) }
         if let frame = geometry.handle { text(RowText.handle(row, type), in: frame) }
         if let frame = geometry.context { text(RowText.context(row, type), in: frame) }
         if let frame = geometry.badge, let badge = row.badge {

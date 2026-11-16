@@ -904,12 +904,24 @@ public final class InfluxStore: Sendable {
                     SELECT group_concat(boostedBy, \(TimelineRow.boosterSeparator))
                     FROM (
                         SELECT boostedBy FROM (
+                            -- Once per account; and once per name where a
+                            -- rich post has a booster of that name: a rich
+                            -- post merges only with its own bridged copies,
+                            -- where one person's boost arrives again under
+                            -- the bridge's ID (#270).
                             SELECT boostedBy, sortDate, sourceID, remoteID, row_number() OVER (
-                                PARTITION BY COALESCE(boostedByID, boostedBy)
-                                ORDER BY sortDate, sourceID, remoteID
+                                PARTITION BY CASE
+                                    WHEN EXISTS (
+                                        SELECT 1 FROM item r JOIN source rs ON rs.id = r.sourceID
+                                        WHERE r.mergeKey = item.mergeKey AND r.boostedBy = item.boostedBy
+                                            AND rs.kind = \(Source.Kind.sammyFeed.rawValue) AND r.kind = \(Item.Kind.post.rawValue)
+                                    ) THEN 'rich:' || item.boostedBy
+                                    ELSE COALESCE(item.boostedByID, item.boostedBy)
+                                END
+                                ORDER BY item.sortDate, item.sourceID, item.remoteID
                             ) AS boost
                             FROM item
-                            WHERE mergeKey = i.mergeKey AND boostedBy IS NOT NULL AND \(inScope)
+                            WHERE item.mergeKey = i.mergeKey AND item.boostedBy IS NOT NULL AND \(inScope)
                         )
                         WHERE boost = 1
                         ORDER BY sortDate, sourceID, remoteID
@@ -921,6 +933,21 @@ public final class InfluxStore: Sendable {
                     ORDER BY sortDate, sourceID, remoteID
                     LIMIT 1
                 ) AS boosterAvatar,
+                -- When it was first boosted, never after that copy was
+                -- fetched. A rich feed's repost has no time of its own and is
+                -- dated at the original, so a dated copy's boost comes first
+                -- (#270).
+                COALESCE(
+                    (
+                        SELECT MIN(MIN(sortDate, fetchedAt)) FROM item
+                        WHERE mergeKey = i.mergeKey AND boostedBy IS NOT NULL AND \(inScope)
+                            AND sourceID NOT IN (SELECT id FROM source WHERE kind = \(Source.Kind.sammyFeed.rawValue))
+                    ),
+                    (
+                        SELECT MIN(MIN(sortDate, fetchedAt)) FROM item
+                        WHERE mergeKey = i.mergeKey AND boostedBy IS NOT NULL AND \(inScope)
+                    )
+                ) AS boostedAt,
                 COALESCE(r.isRead, 0) AS isRead,
                 COALESCE(b.isBookmarked, 0) AS articleBookmarked
             FROM ranked

@@ -54,9 +54,10 @@ struct RowGeometry: Sendable, Equatable {
     /// The light-action icons along the bottom of a row, one per
     /// `RowAction.available(for:)`, in order; empty when no action applies.
     var actions: [CGRect] = []
-    /// A late row's received time, on its own line under the header when
-    /// the header is too narrow to hold it beside the name (#261).
-    var received: CGRect? = nil
+    /// A boosted row's boost time and a late row's received time, on a
+    /// line of their own under the header when the header is too narrow to
+    /// hold them beside the name (#261, #270).
+    var later: CGRect? = nil
 }
 
 /// The icons along the bottom of a post: open its thread (where its
@@ -129,12 +130,13 @@ enum RowLayout {
         let dot = CGRect(x: left, y: y + (metaHeight - dotSize) / 2, width: dotSize, height: dotSize)
         let headerX = left + dotSize + 8
         let headerWidth = max(left + textWidth - headerX, 1)
-        // A late row's received time goes on a line of its own when, beside
-        // it, the name would keep less than six ems; it is never cut.
+        // The boost and received times go on a line of their own when,
+        // beside them, the name would keep less than six ems; they are
+        // never cut.
         let shortName = min(singleLineWidth(RowText.headerName(row, type, withHandle: false)), type.meta.pointSize * 6)
-        let receivedText = RowText.receivedLine(row, type)
-        let splitsReceived = receivedText != nil && singleLineWidth(RowText.time(row, type)) + shortName > headerWidth
-        let timeWidth = singleLineWidth(RowText.time(row, type, withReceived: !splitsReceived))
+        let laterText = RowText.laterLine(row, type)
+        let splitsLater = laterText != nil && singleLineWidth(RowText.time(row, type)) + shortName > headerWidth
+        let timeWidth = singleLineWidth(RowText.time(row, type, withLater: !splitsLater))
         let whole = singleLineWidth(RowText.headerName(row, type, withHandle: true))
         let fits = whole + timeWidth <= headerWidth
         // When it doesn't all fit, the name keeps the line with the time
@@ -146,11 +148,11 @@ enum RowLayout {
         let time = CGRect(x: header.maxX, y: y, width: min(timeWidth, headerWidth), height: metaHeight)
         y += metaHeight
 
-        var received: CGRect?
-        if splitsReceived, let receivedText {
+        var later: CGRect?
+        if splitsLater, let laterText {
             y += 2
-            let height = lines(receivedText, width: headerWidth, font: type.meta, max: metaLines)
-            received = CGRect(x: headerX, y: y, width: headerWidth, height: height)
+            let height = lines(laterText, width: headerWidth, font: type.meta, max: metaLines)
+            later = CGRect(x: headerX, y: y, width: headerWidth, height: height)
             y += height
         }
 
@@ -309,7 +311,7 @@ enum RowLayout {
                            linkSite: linkSite, linkTitle: linkTitle, linkSummary: linkSummary, media: media,
                            quote: quote, quoteImage: quoteImage, quoteHeader: quoteHeader, quoteBody: quoteBody,
                            quoteSite: quoteSite, actions: actions)
-        geometry.received = received
+        geometry.later = later
         return geometry
     }
 

@@ -47,6 +47,9 @@ public struct TimelineRow: Sendable, Hashable, Identifiable {
     /// it differs from `sortDate` when the row arrived late and was placed
     /// below the reader's line instead (ADR 0041).
     public var postedAt: Date? = nil
+    /// When the post was first boosted, for a row with boosters: the
+    /// earliest boost in scope, never after it was fetched.
+    public var boostedAt: Date? = nil
     /// The score shown beside the title, for a feed that sends one.
     public var badge: Item.Badge? = nil
     /// Whether the post's thread can be opened, which its service decides
@@ -126,6 +129,7 @@ extension TimelineRow: FetchableRecord {
         publishedAt = row["publishedAt"]
         sortDate = row["sortDate"]
         postedAt = row["postedAt"]
+        boostedAt = row["boostedAt"]
         let boosters: String? = row["boosters"]
         boostedBy = boosters.map { $0.components(separatedBy: Self.boosterSeparator) } ?? []
         replyToHandle = row["replyToHandle"]

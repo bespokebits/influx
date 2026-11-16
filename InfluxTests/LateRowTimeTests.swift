@@ -58,7 +58,7 @@ import InfluxKit
         let b = try #require(try await rows()["b"])
         let environment = RowEnvironment(width: 390, scale: 3, dark: false, typography: type)
         let geometry = RowLayout.geometry(for: b, in: environment)
-        #expect(geometry.received == nil)
+        #expect(geometry.later == nil)
         #expect(geometry.time.width >= RowLayout.singleLineWidth(RowText.time(b, type)))
     }
 
@@ -69,12 +69,12 @@ import InfluxKit
         let large = Typography(scale: 2.5)
         let environment = RowEnvironment(width: 390, scale: 3, dark: false, typography: large)
         let geometry = RowLayout.geometry(for: b, in: environment)
-        let received = try #require(geometry.received)
+        let received = try #require(geometry.later)
         #expect(received.minY > geometry.header.maxY && received.maxY < geometry.body.minY)
-        #expect(geometry.time.width >= RowLayout.singleLineWidth(RowText.time(b, large, withReceived: false)))
-        #expect(!RowText.time(b, large, withReceived: false).string.contains("→"))
+        #expect(geometry.time.width >= RowLayout.singleLineWidth(RowText.time(b, large, withLater: false)))
+        #expect(!RowText.time(b, large, withLater: false).string.contains("→"))
         #expect(received.maxX <= environment.width - RowLayout.inset)
-        let line = try #require(RowText.receivedLine(b, large))
+        let line = try #require(RowText.laterLine(b, large))
         #expect(line.string.hasPrefix("→ "))
         #expect(received.height >= Broadsheet.lineHeight(large.meta))
     }
@@ -82,7 +82,7 @@ import InfluxKit
     @Test func aReceivedTimeOnAnotherDayCarriesItsDay() {
         let posted = t0, sameDay = t0 + 480
         let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: posted)!
-        #expect(RowText.receivedText(sameDay, posted: posted) == sameDay.formatted(.dateTime.hour().minute()))
-        #expect(RowText.receivedText(nextDay, posted: posted) == nextDay.formatted(.dateTime.weekday(.abbreviated).hour().minute()))
+        #expect(RowText.laterText(sameDay, after: posted) == sameDay.formatted(.dateTime.hour().minute()))
+        #expect(RowText.laterText(nextDay, after: posted) == nextDay.formatted(.dateTime.weekday(.abbreviated).hour().minute()))
     }
 }
