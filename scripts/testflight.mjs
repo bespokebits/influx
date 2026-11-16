@@ -7,6 +7,7 @@
 //   scripts/testflight.mjs status                       the last runs and builds
 //   scripts/testflight.mjs lane                         every Xcode Cloud product's runs in progress
 //   scripts/testflight.mjs wait <run number>            until the run ends
+//   scripts/testflight.mjs external                     what external (public) testing has and lacks
 //
 // The account's Xcode Cloud products share one build lane, so `start` refuses
 // (exit 3) while a run of any product is in progress, this one's included,
@@ -179,6 +180,44 @@ async function buildsOf(run) {
   });
 }
 
+/** What external testing needs, read only: test information, the Beta App
+ *  Review contact, the beta licence, the groups and public links, and the
+ *  newest builds' external state. Prints values that are public on the
+ *  TestFlight page, and only whether the review contact is filled in. */
+async function external() {
+  const { app } = await product();
+  const set = (value) => (value ? "set" : "MISSING");
+  console.log(`app: ${app.attributes.name} (${app.attributes.bundleId}), primary locale ${app.attributes.primaryLocale}`);
+  const localizations = (await api(`/v1/apps/${app.id}/betaAppLocalizations`)).data;
+  if (localizations.length === 0) console.log("test information: MISSING (no beta app localization)");
+  for (const l of localizations) {
+    const a = l.attributes;
+    console.log(`test information (${a.locale}): description ${set(a.description)}, feedback email ${set(a.feedbackEmail)}, ` +
+      `privacy policy ${a.privacyPolicyUrl ?? "MISSING"}, marketing ${a.marketingUrl ?? "none"}`);
+  }
+  const review = (await api(`/v1/apps/${app.id}/betaAppReviewDetail`)).data?.attributes ?? {};
+  console.log(`beta review contact: name ${set(review.contactFirstName && review.contactLastName)}, email ${set(review.contactEmail)}, ` +
+    `phone ${set(review.contactPhone)}; sign-in required ${review.demoAccountRequired ? "yes" : "no"}; notes ${set(review.notes)}`);
+  const licence = (await api(`/v1/apps/${app.id}/betaLicenseAgreement`)).data?.attributes ?? {};
+  console.log(`beta licence agreement: ${licence.agreementText ? "custom" : "Apple's standard"}`);
+  const groups = (await api(`/v1/apps/${app.id}/betaGroups`)).data;
+  for (const g of groups) {
+    const a = g.attributes;
+    console.log(`group "${a.name}": ${a.isInternalGroup ? "internal" : "external"}` +
+      (a.isInternalGroup ? "" : `, public link ${a.publicLinkEnabled ? `on (${a.publicLink}, limit ${a.publicLinkLimit ?? "none"})` : "off"}`));
+  }
+  if (!groups.some((g) => !g.attributes.isInternalGroup)) console.log("external group: MISSING");
+  const builds = await api(`/v1/builds?filter[app]=${app.id}&sort=-uploadedDate&limit=4&include=buildBetaDetail,preReleaseVersion`);
+  const included = Object.fromEntries((builds.included ?? []).map((i) => [`${i.type}:${i.id}`, i.attributes]));
+  for (const b of builds.data) {
+    const version = included[`preReleaseVersions:${b.relationships.preReleaseVersion?.data?.id}`] ?? {};
+    const beta = included[`buildBetaDetails:${b.relationships.buildBetaDetail?.data?.id}`] ?? {};
+    console.log(`build ${version.platform ?? "?"} ${version.version ?? "?"} (${b.attributes.version}): ${b.attributes.processingState}, ` +
+      `encryption declared ${b.attributes.usesNonExemptEncryption === false ? "none" : b.attributes.usesNonExemptEncryption ?? "?"}, ` +
+      `internal ${beta.internalBuildState ?? "?"}, external ${beta.externalBuildState ?? "?"}`);
+  }
+}
+
 async function status() {
   const { product: ciProduct } = await product();
   for (const run of await runs(ciProduct.id, 3)) {
@@ -225,14 +264,14 @@ async function wait(number) {
   }
 }
 
-const USAGE = "usage: scripts/testflight.mjs start [branch] [--dry-run] [--anyway] | status | lane | wait <run number>";
+const USAGE = "usage: scripts/testflight.mjs start [branch] [--dry-run] [--anyway] | status | lane | external | wait <run number>";
 const [command, ...rest] = process.argv.slice(2);
 const flags = rest.filter((r) => r.startsWith("-"));
 const args = rest.filter((r) => !r.startsWith("-"));
 // Anything unexpected is refused before any request: a mistyped --dry-run
 // must not start a real build.
 const allowedFlags = command === "start" ? ["--dry-run", "--anyway"] : [];
-const maxArgs = { start: 1, status: 0, lane: 0, wait: 1 }[command];
+const maxArgs = { start: 1, status: 0, lane: 0, external: 0, wait: 1 }[command];
 if (maxArgs === undefined || args.length > maxArgs || flags.some((f) => !allowedFlags.includes(f))) fail(USAGE);
 switch (command) {
   case "start":
@@ -240,6 +279,9 @@ switch (command) {
     break;
   case "lane":
     await lane();
+    break;
+  case "external":
+    await external();
     break;
   case "status":
     await status();
