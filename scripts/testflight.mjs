@@ -8,6 +8,9 @@
 //   scripts/testflight.mjs lane                         every Xcode Cloud product's runs in progress
 //   scripts/testflight.mjs wait <run number>            until the run ends
 //   scripts/testflight.mjs external                     what external (public) testing has and lacks
+//   scripts/testflight.mjs prepare                      set the test information, review details and public group
+//   scripts/testflight.mjs submit <build> <file>        send a build to the public group and Beta App Review
+//   scripts/testflight.mjs public-link <limit>          open the public group's link to at most <limit> testers
 //
 // The account's Xcode Cloud products share one build lane, so `start` refuses
 // (exit 3) while a run of any product is in progress, this one's included,
@@ -21,8 +24,13 @@
 // committed), with ASC_KEY_ID, ASC_ISSUER_ID and ASC_P8_BASE64 (the .p8,
 // base64). The key needs a role that may start Xcode Cloud builds.
 // Nothing here prints the key.
+//
+// `prepare` also reads the Beta App Review contact, which Apple keeps private,
+// from INFLUX_REVIEW_CONTACT (default ~/.config/influx/review-contact.env,
+// never committed): CONTACT_FIRST_NAME, CONTACT_LAST_NAME and CONTACT_PHONE.
+// Nothing here prints them.
 import { createSign } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -33,6 +41,24 @@ const POLL_SECONDS = 60;
 /** Build states that end a wait as a failure: they don't clear by themselves. */
 const FAILED_PROCESSING = new Set(["INVALID", "FAILED"]);
 const FAILED_TESTING = new Set(["PROCESSING_EXCEPTION", "MISSING_EXPORT_COMPLIANCE", "EXPIRED"]);
+
+// External (public) testing. These are shown on the TestFlight page.
+const LOCALE = "en-US";
+const PUBLIC_GROUP = "Public Beta";
+const FEEDBACK_EMAIL = "influx-feedback@bespokebits.dev";
+const PRIVACY_URL = "https://influx.bespokebits.dev/privacy";
+const DESCRIPTION =
+  "Influx reads your RSS feeds and your Bluesky and Mastodon timelines together, oldest first, " +
+  "so you catch up from where you left off. Your sources and your place sync through iCloud, " +
+  "and the timeline is built to scroll smoothly through thousands of posts.";
+// For Beta App Review only.
+const REVIEW_NOTES =
+  "No sign-in is needed. On iPhone, open Sources and choose Add Feed…; on the Mac, choose File > Add Feed…. " +
+  "Any RSS feed address works, " +
+  "for example https://www.apple.com/newsroom/rss-feed.rss. Bluesky and Mastodon timelines need an " +
+  "account of the reviewer's own on those services; Influx has no account of its own.";
+/** External states in which a build is already with Beta App Review or past it. */
+const SUBMITTED = new Set(["WAITING_FOR_BETA_REVIEW", "IN_BETA_REVIEW", "BETA_APPROVED", "IN_BETA_TESTING"]);
 
 function fail(message, code = 2) {
   console.error(`testflight: ${message}`);
@@ -218,6 +244,150 @@ async function external() {
   }
 }
 
+/** The external group that the public link belongs to, or undefined. */
+async function publicGroup(appID) {
+  return (await api(`/v1/apps/${appID}/betaGroups?limit=200`)).data
+    .find((g) => !g.attributes.isInternalGroup && g.attributes.name === PUBLIC_GROUP);
+}
+
+/** The private review contact, or undefined when its file is missing. */
+function reviewContact() {
+  const file = process.env.INFLUX_REVIEW_CONTACT ?? join(homedir(), ".config/influx/review-contact.env");
+  if (!existsSync(file)) return undefined;
+  process.loadEnvFile(file);
+  const { CONTACT_FIRST_NAME: first, CONTACT_LAST_NAME: last, CONTACT_PHONE: phone } = process.env;
+  if (!first || !last || !phone) fail(`${file} needs CONTACT_FIRST_NAME, CONTACT_LAST_NAME and CONTACT_PHONE`);
+  return { contactFirstName: first, contactLastName: last, contactPhone: phone };
+}
+
+/** Sets what external testing needs and makes the public group, with its
+ *  link closed. Safe to run again: it updates what is there. */
+async function prepare() {
+  const { app } = await product();
+  const info = { description: DESCRIPTION, feedbackEmail: FEEDBACK_EMAIL, privacyPolicyUrl: PRIVACY_URL };
+  const existing = (await api(`/v1/apps/${app.id}/betaAppLocalizations`)).data.find((l) => l.attributes.locale === LOCALE);
+  if (existing) {
+    await api(`/v1/betaAppLocalizations/${existing.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ data: { type: "betaAppLocalizations", id: existing.id, attributes: info } }),
+    });
+  } else {
+    await api("/v1/betaAppLocalizations", {
+      method: "POST",
+      body: JSON.stringify({
+        data: {
+          type: "betaAppLocalizations",
+          attributes: { locale: LOCALE, ...info },
+          relationships: { app: { data: { type: "apps", id: app.id } } },
+        },
+      }),
+    });
+  }
+  console.log(`test information (${LOCALE}): set`);
+  const contact = reviewContact();
+  const detail = (await api(`/v1/apps/${app.id}/betaAppReviewDetail`)).data;
+  await api(`/v1/betaAppReviewDetails/${detail.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      data: {
+        type: "betaAppReviewDetails",
+        id: detail.id,
+        attributes: { contactEmail: FEEDBACK_EMAIL, demoAccountRequired: false, notes: REVIEW_NOTES, ...contact },
+      },
+    }),
+  });
+  console.log(`beta review details: set${contact ? "" : "; contact name and phone MISSING (no review contact file)"}`);
+  if (await publicGroup(app.id)) {
+    console.log(`group "${PUBLIC_GROUP}": already there`);
+  } else {
+    await api("/v1/betaGroups", {
+      method: "POST",
+      body: JSON.stringify({
+        data: {
+          type: "betaGroups",
+          attributes: { name: PUBLIC_GROUP, publicLinkEnabled: false, feedbackEnabled: true },
+          relationships: { app: { data: { type: "apps", id: app.id } } },
+        },
+      }),
+    });
+    console.log(`group "${PUBLIC_GROUP}": made, link closed`);
+  }
+  if (!contact) process.exit(1);
+}
+
+/** Gives every platform's build `number` the "What to Test" text in `file`,
+ *  adds it to the public group and submits it for Beta App Review. Builds
+ *  already submitted or approved are left as they are. */
+async function submit(number, file) {
+  if (!existsSync(file)) fail(`no file ${file}`);
+  const whatsNew = readFileSync(file, "utf8").trim();
+  if (!whatsNew || whatsNew.length > 4000) fail(`${file} must hold 1 to 4,000 characters of "What to Test"`);
+  const { app } = await product();
+  const group = await publicGroup(app.id);
+  if (!group) fail(`no group "${PUBLIC_GROUP}": run prepare first`);
+  const builds = await api(`/v1/builds?filter[app]=${app.id}&filter[version]=${number}&include=buildBetaDetail,preReleaseVersion&limit=10`);
+  if (builds.data.length === 0) fail(`no build ${number}`);
+  const included = Object.fromEntries((builds.included ?? []).map((i) => [`${i.type}:${i.id}`, i.attributes]));
+  for (const b of builds.data) {
+    const platform = included[`preReleaseVersions:${b.relationships.preReleaseVersion?.data?.id}`]?.platform ?? "?";
+    const state = included[`buildBetaDetails:${b.relationships.buildBetaDetail?.data?.id}`]?.externalBuildState;
+    if (b.attributes.processingState !== "VALID") fail(`${platform} build ${number} is ${b.attributes.processingState}, not VALID`);
+    const localizations = (await api(`/v1/builds/${b.id}/betaBuildLocalizations`)).data;
+    const localization = localizations.find((l) => l.attributes.locale === LOCALE);
+    if (localization) {
+      await api(`/v1/betaBuildLocalizations/${localization.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ data: { type: "betaBuildLocalizations", id: localization.id, attributes: { whatsNew } } }),
+      });
+    } else {
+      await api("/v1/betaBuildLocalizations", {
+        method: "POST",
+        body: JSON.stringify({
+          data: {
+            type: "betaBuildLocalizations",
+            attributes: { locale: LOCALE, whatsNew },
+            relationships: { build: { data: { type: "builds", id: b.id } } },
+          },
+        }),
+      });
+    }
+    await api(`/v1/betaGroups/${group.id}/relationships/builds`, {
+      method: "POST",
+      body: JSON.stringify({ data: [{ type: "builds", id: b.id }] }),
+    });
+    if (SUBMITTED.has(state)) {
+      console.log(`${platform} build ${number}: in the group; already ${state}`);
+      continue;
+    }
+    await api("/v1/betaAppReviewSubmissions", {
+      method: "POST",
+      body: JSON.stringify({
+        data: { type: "betaAppReviewSubmissions", relationships: { build: { data: { type: "builds", id: b.id } } } },
+      }),
+    });
+    console.log(`${platform} build ${number}: in the group, submitted for Beta App Review`);
+  }
+}
+
+/** Opens the public group's link, capped at `limit` testers. */
+async function publicLink(limit) {
+  const { app } = await product();
+  const group = await publicGroup(app.id);
+  if (!group) fail(`no group "${PUBLIC_GROUP}": run prepare first`);
+  const updated = await api(`/v1/betaGroups/${group.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      data: {
+        type: "betaGroups",
+        id: group.id,
+        attributes: { publicLinkEnabled: true, publicLinkLimitEnabled: true, publicLinkLimit: limit },
+      },
+    }),
+  });
+  const a = updated.data.attributes;
+  console.log(`group "${PUBLIC_GROUP}": public link ${a.publicLinkEnabled ? "on" : "off"}, ${a.publicLink ?? "no link yet"}, limit ${a.publicLinkLimit}`);
+}
+
 async function status() {
   const { product: ciProduct } = await product();
   for (const run of await runs(ciProduct.id, 3)) {
@@ -264,15 +434,16 @@ async function wait(number) {
   }
 }
 
-const USAGE = "usage: scripts/testflight.mjs start [branch] [--dry-run] [--anyway] | status | lane | external | wait <run number>";
+const USAGE = "usage: scripts/testflight.mjs start [branch] [--dry-run] [--anyway] | status | lane | external | prepare | submit <build> <what-to-test file> | public-link <limit> | wait <run number>";
 const [command, ...rest] = process.argv.slice(2);
 const flags = rest.filter((r) => r.startsWith("-"));
 const args = rest.filter((r) => !r.startsWith("-"));
 // Anything unexpected is refused before any request: a mistyped --dry-run
 // must not start a real build.
 const allowedFlags = command === "start" ? ["--dry-run", "--anyway"] : [];
-const maxArgs = { start: 1, status: 0, lane: 0, external: 0, wait: 1 }[command];
-if (maxArgs === undefined || args.length > maxArgs || flags.some((f) => !allowedFlags.includes(f))) fail(USAGE);
+const maxArgs = { start: 1, status: 0, lane: 0, external: 0, prepare: 0, submit: 2, "public-link": 1, wait: 1 }[command];
+const minArgs = { submit: 2, "public-link": 1, wait: 1 }[command] ?? 0;
+if (maxArgs === undefined || args.length > maxArgs || args.length < minArgs || flags.some((f) => !allowedFlags.includes(f))) fail(USAGE);
 switch (command) {
   case "start":
     await start(args[0] ?? "main", flags.includes("--dry-run"), flags.includes("--anyway"));
@@ -286,6 +457,20 @@ switch (command) {
   case "status":
     await status();
     break;
+  case "prepare":
+    await prepare();
+    break;
+  case "submit":
+    if (!/^\d+$/.test(args[0])) fail(USAGE);
+    await submit(args[0], args[1]);
+    break;
+  case "public-link": {
+    // TestFlight allows 1 to 10,000 testers per link.
+    const limit = /^\d+$/.test(args[0]) ? Number(args[0]) : NaN;
+    if (!(limit >= 1 && limit <= 10000)) fail(USAGE);
+    await publicLink(limit);
+    break;
+  }
   case "wait": {
     const number = /^\d+$/.test(args[0] ?? "") ? Number(args[0]) : NaN;
     if (!Number.isInteger(number)) fail(USAGE);
