@@ -456,9 +456,17 @@ export function memoryStorage() {
   const map = new Map<string, unknown>();
   /** Every write, in order, for checking what a race left behind. */
   const writes: [string, unknown][] = [];
+  /** The alarm's time, as a Durable Object keeps it; null when none is set. */
+  const alarm = { at: null as number | null };
   return {
     map,
     writes,
+    alarm,
+    getAlarm: async () => (await yieldToOthers(), alarm.at),
+    setAlarm: async (time: number) => {
+      await yieldToOthers();
+      alarm.at = time;
+    },
     get: async <T>(key: string) => (await yieldToOthers(), structuredClone(map.get(key)) as T | undefined),
     /** One key, or several at once as a Durable Object writes them: all in one step. */
     put: async (key: string | Record<string, unknown>, value?: unknown) => {
@@ -512,7 +520,17 @@ export function namespace(make: (state: State) => { fetch(request: Request): Pro
     return objects.get(id)!;
   };
   const binding: Namespace = { idFromName: (name) => name, get: (id) => entry(id as string).object };
-  return { binding, storage: (name: string) => entry(name).storage, names: () => [...objects.keys()] };
+  return {
+    binding,
+    storage: (name: string) => entry(name).storage,
+    names: () => [...objects.keys()],
+    /** Fires the object's alarm as a Durable Object does: it is cleared, then `alarm()` runs. */
+    fireAlarm: async (name: string) => {
+      const { object, storage } = entry(name);
+      storage.alarm.at = null;
+      await (object as unknown as { alarm(): Promise<void> }).alarm();
+    },
+  };
 }
 
 export async function attestEnv(overrides: Partial<Env> = {}) {

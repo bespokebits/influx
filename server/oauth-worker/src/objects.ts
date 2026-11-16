@@ -21,6 +21,10 @@ export interface Storage {
   delete(key: string | string[]): Promise<unknown>;
   /** In key order; `start` is inclusive, `end` exclusive, as in a Durable Object. */
   list<T>(options?: { start?: string; end?: string }): Promise<Map<string, T>>;
+  /** The time the object's alarm is set for, in ms since 1970, or null. */
+  getAlarm(): Promise<number | null>;
+  /** Sets the object's one alarm, replacing any other; `alarm()` runs then. */
+  setAlarm(time: number): Promise<void>;
 }
 
 export interface State {
@@ -316,6 +320,11 @@ function utcDay(now: number, days = 0): string {
   return new Date(now - days * DAY_MS).toISOString().slice(0, 10);
 }
 
+/** A minute into the next UTC day after `now`, in ms since 1970. */
+function nextDayStart(now: number): number {
+  return (Math.floor(now / DAY_MS) + 1) * DAY_MS + 60_000;
+}
+
 /** A day's stored reports, oldest first. */
 type StoredDay = Record<string, unknown>[];
 
@@ -324,8 +333,9 @@ type StoredDay = Record<string, unknown>[];
  * record per UTC day under its date: the day's reports, in the order they
  * came, each with the time it came. The route checks a report before it
  * gets here. At most 200 a day, which keeps a day's record well under a
- * stored value's limit, and the days before the last 90 go when a new day's
- * first report arrives.
+ * stored value's limit. The days before the last 90 go when a new day's
+ * first report arrives, and also at an alarm early each UTC day while any
+ * report is kept, so they go on time even when reports stop coming.
  *
  * Each report carries a random ID the app made for it. An app whose answer
  * was lost sends it again, so each one taken is noted under `seen:<ID>`
@@ -368,18 +378,33 @@ export class PerfReports {
       if ((await storage.get<string>(name)) !== undefined) return empty(204);
       const reports = (await storage.get<StoredDay>(today)) ?? [];
       if (reports.length >= PERF_DAILY_LIMIT) return empty(429);
-      if (reports.length === 0) {
-        const cutoff = utcDay(now, PERF_RETENTION_DAYS - 1);
-        const oldDays = [...(await storage.list({ end: cutoff })).keys()];
-        const oldNames = [...(await storage.list<string>({ start: "seen:", end: "seen;" })).entries()].filter(([, day]) => day < cutoff).map(([key]) => key);
-        const old = [...oldDays, ...oldNames];
-        // A Durable Object deletes at most 128 keys a call.
-        for (let start = 0; start < old.length; start += DELETE_BATCH) await storage.delete(old.slice(start, start + DELETE_BATCH));
-      }
+      if (reports.length === 0) await this.expire(now);
       // The report and its name in one write, so a failure part way can't
       // keep the report without the name that stops it being kept twice.
       await storage.put({ [today]: [...reports, { ...report, receivedAt: new Date(now).toISOString() }], [name]: today });
+      if ((await storage.getAlarm()) === null) await storage.setAlarm(nextDayStart(now));
       return empty(204);
     });
+  }
+
+  /** The daily alarm: removes expired days, and comes again tomorrow while
+   *  anything is still kept. */
+  async alarm(): Promise<void> {
+    await this.state.blockConcurrencyWhile(async () => {
+      const now = Date.now();
+      await this.expire(now);
+      if ((await this.state.storage.list()).size > 0) await this.state.storage.setAlarm(nextDayStart(now));
+    });
+  }
+
+  /** Removes the days before the last 90, and the names of their reports. */
+  private async expire(now: number): Promise<void> {
+    const storage = this.state.storage;
+    const cutoff = utcDay(now, PERF_RETENTION_DAYS - 1);
+    const oldDays = [...(await storage.list({ end: cutoff })).keys()];
+    const oldNames = [...(await storage.list<string>({ start: "seen:", end: "seen;" })).entries()].filter(([, day]) => day < cutoff).map(([key]) => key);
+    const old = [...oldDays, ...oldNames];
+    // A Durable Object deletes at most 128 keys a call.
+    for (let start = 0; start < old.length; start += DELETE_BATCH) await storage.delete(old.slice(start, start + DELETE_BATCH));
   }
 }

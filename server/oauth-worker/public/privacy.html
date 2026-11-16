@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Influx privacy policy</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 17px/1.55 Georgia, serif; max-width: 38rem; margin: 3rem auto 5rem; padding: 0 1rem; }
+  h1 { font-size: 1.7rem; margin-bottom: 0.2rem; }
+  h2 { font-size: 1.15rem; margin-top: 2rem; }
+  p.updated { margin-top: 0; opacity: 0.7; }
+</style>
+</head>
+<body>
+<h1>Influx privacy policy</h1>
+<p class="updated">Last updated 16 November 2026</p>
+
+<p>Influx is a reader for your RSS feeds and social timelines, from Bespoke Bits. It has no ads, no tracking and no analytics kit, and it sells nothing about you. This page says what Influx keeps, where it goes, and why.</p>
+
+<h2>What stays with you</h2>
+<p>Your sources, the posts and articles Influx fetches, and where you have read to are stored on your device. If you use iCloud, Influx syncs everything but the posts themselves (your sources, views, filters, what you have read and where you are) to your other devices through your own private iCloud database. Apple holds that data for you, and Bespoke Bits cannot read it. Your sign-ins are kept in your keychain, never on our servers: Mastodon and Sammy sign-ins in your iCloud Keychain, so your other devices can use them, and Bluesky sign-ins only on the device where you signed in.</p>
+
+<h2>What Influx connects to</h2>
+<p>Influx reads each source you add directly from your device: the feeds you subscribe to, your Bluesky and Mastodon servers, and a Sammy server if you connect one. Pictures, videos and link previews load from where they are published. Like a web browser, each of those services sees your device's network address and what it asks for, under its own privacy policy.</p>
+
+<h2>Influx's own service</h2>
+<p>Influx runs one small service, at influx.bespokebits.dev, for two jobs.</p>
+<ul>
+  <li><strong>Bluesky sign-in.</strong> Bluesky asks apps to prove who they are when you sign in. The service signs that proof for Influx. Only a genuine, unmodified copy of Influx can ask, which it shows with Apple's App Attest. For each installation, the service keeps the public half of the installation's App Attest key, a counter, and the record Apple issues for it. None of these names you or your account. The service never sees your password or your posts. Your network address is used only to limit how often anyone can ask, and it is not stored.</li>
+  <li><strong>Performance reports, in test builds only.</strong> Builds installed through TestFlight send a short report about once a day: the device model, the system version, the Influx build, and Apple's performance figures (MetricKit) for how smoothly the timeline scrolled and how long the app took to start and to come back. If you connect Sammy, the report also counts how its pictures and videos loaded (straight from where they are published, or through Sammy, and how often Sammy asked Influx to slow down) and how long pictures took to arrive, in broad ranges. A report carries no account, post, source, picture address or reading data. Like a sign-in request, each upload is checked with the installation's App Attest key, so only a genuine copy of Influx can send one, but the report is kept without that key and without your network address. Because reports name no one, the service lets anyone read them back; we use them to check each build against Influx's speed targets. Reports are kept for 90 days. Builds from the App Store send none.</li>
+</ul>
+
+<h2>Children</h2>
+<p>Influx is not meant for children under 13, and we do not knowingly collect anything from them.</p>
+
+<h2>Changes</h2>
+<p>If this policy changes, this page will say so and show a new date.</p>
+
+<h2>Contact</h2>
+<p>Questions about privacy: <a href="mailto:influx-feedback@bespokebits.dev">influx-feedback@bespokebits.dev</a>.</p>
+</body>
+</html>

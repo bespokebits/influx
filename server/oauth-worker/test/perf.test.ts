@@ -309,6 +309,28 @@ test("reports are kept 90 days, and read back newest first for the days asked", 
   assert.equal(stored(perf).length, 1);
 });
 
+test("a daily alarm removes reports past 90 days when no new report comes", async () => {
+  const { env, perf } = await attestEnv();
+  const key = await registered(env);
+  const reports = perf.storage("reports");
+  const at = (build: string) => ({ ...REPORT, build, receivedAt: "x" });
+  assert.equal((await worker.fetch(await reportRequest(env, key, 1), env)).status, 204);
+  // A stored report sets the alarm early in the next UTC day.
+  const tomorrow = (Math.floor(Date.now() / DAY_MS) + 1) * DAY_MS;
+  assert.ok(reports.alarm.at !== null && reports.alarm.at > tomorrow && reports.alarm.at < tomorrow + 60 * 60 * 1000);
+  // Reports stop; days age out with no report to clear them.
+  reports.map.set(day(PERF_RETENTION_DAYS), [at("old")]);
+  reports.map.set("seen:old", day(PERF_RETENTION_DAYS));
+  await perf.fireAlarm("reports");
+  const seen = `seen:${REPORT.id}`;
+  assert.deepEqual([...reports.map.keys()].sort(), [day(), seen].sort());
+  assert.ok(reports.alarm.at !== null, "it comes again while reports are kept");
+  // Once nothing is kept, it stops.
+  reports.map.clear();
+  await perf.fireAlarm("reports");
+  assert.equal(reports.alarm.at, null);
+});
+
 test("only POST sends a report and only GET reads them, each rate limited", async () => {
   const { env } = await attestEnv();
   await expectError(await worker.fetch(new Request(`${ORIGIN}/perf/report`), env), 405, "method_not_allowed");
