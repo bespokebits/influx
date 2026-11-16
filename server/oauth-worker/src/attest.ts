@@ -60,9 +60,10 @@ export const MACOS_ACL_BLOB = fromBase64("MEAMAjExMDowCQwCb2uhAwEB/zAJDAJvYaEDAQ
  * through TestFlight (ADR 0042), in production; the debug app in
  * development.
  */
+export const PREVIEW_APP = "dev.bespokebits.influx.preview";
 export const ATTESTED_APPS: Readonly<Record<string, "production" | "development">> = {
   "dev.bespokebits.influx": "production",
-  "dev.bespokebits.influx.preview": "production",
+  [PREVIEW_APP]: "production",
   "dev.bespokebits.influx.dev": "development",
 };
 

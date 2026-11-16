@@ -11,14 +11,21 @@ enum FieldPerformance {
     /// (UI tests) and Perf builds have their own and never report.
     static let releaseBundleID = "dev.bespokebits.influx"
 
+    /// Whether an app with this bundle ID reports: the release app, and
+    /// Influx Preview, which ships through TestFlight too (ADR 0042). The
+    /// signing service tells their reports apart by the attested key.
+    static func reports(bundleID: String?) -> Bool {
+        bundleID == releaseBundleID || bundleID == releaseBundleID + ".preview"
+    }
+
     private static var started = false
 
-    /// Starts reporting, after the first screen, if this is the release
-    /// app; InfluxMetrics then subscribes to MetricKit only once the App
+    /// Starts reporting, after the first screen, if this is an app that
+    /// reports; InfluxMetrics then subscribes to MetricKit only once the App
     /// Store confirms a TestFlight install. Reports not sent before are
     /// tried again then too. Sample, perf and test-host runs call nothing.
     static func start() {
-        guard !started, Bundle.main.bundleIdentifier == releaseBundleID,
+        guard !started, reports(bundleID: Bundle.main.bundleIdentifier),
               let start = InfluxMetricsFramework.start, let file = try? supportFile("PerformanceReports.json"),
               let tallyFile = try? supportFile("SammyMediaTally.json") else { return }
         started = true

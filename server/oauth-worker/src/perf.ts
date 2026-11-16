@@ -5,7 +5,8 @@
 // the OS, the hardware model and the figures; nothing about the caller (its
 // address or key) is kept.
 
-import { callerAttestation, rateLimited, type Options } from "./callers.ts";
+import { PREVIEW_APP } from "./attest.ts";
+import { attestedCaller, rateLimited, type Options } from "./callers.ts";
 import { bodyBytes, error, json, jsonObject } from "./http.ts";
 import type { Env } from "./index.ts";
 import { PERF_RETENTION_DAYS } from "./objects.ts";
@@ -98,9 +99,15 @@ export interface PerfReport {
   sammyMedia?: SammyMedia;
 }
 
-/** A stored report: the report, and when the Worker took it. */
+/**
+ * A stored report: the report, when the Worker took it, and which app sent
+ * it when that was Influx Preview (ADR 0042). The Worker adds the app from
+ * the caller's attested key. A report can't name its own: `app` is not a
+ * field a report may carry.
+ */
 export interface StoredReport extends PerfReport {
   receivedAt: string;
+  app?: "preview";
 }
 
 const REPORT_FIELDS = new Set(["id", "platform", "build", "os", "device", "periodStart", "periodEnd", "scrollHitchMsPerS", "launch", "resume", "sammyMedia"]);
@@ -254,7 +261,7 @@ export async function report(request: Request, env: Env, options: Options): Prom
   const report = validReport(body.report);
   if (!report) return error(400, "invalid_report");
 
-  const attestation = await callerAttestation(request, raw, body, env, options);
+  const { attested: attestation, appId } = await attestedCaller(request, raw, body, env, options);
   if (attestation === "unknown") return error(401, "key_unknown");
   if (attestation === "policy") {
     // `app_not_accepted` would also stop the app's Bluesky sign-ins for the
@@ -263,7 +270,8 @@ export async function report(request: Request, env: Env, options: Options): Prom
   }
   if (attestation !== "attested") return error(401, "attestation_required");
 
-  const stored = await perfReports(env).fetch(new Request("https://perf/add", { method: "POST", body: JSON.stringify(report) }));
+  const kept = appId === PREVIEW_APP ? { ...report, app: "preview" } : report;
+  const stored = await perfReports(env).fetch(new Request("https://perf/add", { method: "POST", body: JSON.stringify(kept) }));
   if (stored.status === 429) return error(503, "daily_limit", { "Retry-After": "3600" });
   if (stored.status !== 204) return error(503, "unavailable");
   return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
@@ -306,6 +314,8 @@ export interface Hitches {
 }
 
 export interface Summary {
+  /** Present for Influx Preview's builds, which are numbered apart from Influx's. */
+  app?: "preview";
   platform: "ios" | "mac";
   build: string;
   reports: number;
@@ -436,21 +446,22 @@ function hitchesOf(group: PerfReport[]): Hitches {
 }
 
 /**
- * Per platform and build: how many reports, the median and worst scroll
+ * Per app, platform and build: how many reports, the median and worst scroll
  * hitch ratio among those that measured scrolling (also per hardware
  * model), launch and resume percentiles from every report's histograms
- * together, and the Sammy media counts added up. iPhone first, then the
- * Mac, newest build first.
+ * together, and the Sammy media counts added up. Influx first, then Influx
+ * Preview; in each, iPhone first, then the Mac, newest build first.
  */
-export function summarize(reports: PerfReport[]): Summary[] {
-  const groups = new Map<string, PerfReport[]>();
+export function summarize(reports: (PerfReport & { app?: "preview" })[]): Summary[] {
+  const groups = new Map<string, (PerfReport & { app?: "preview" })[]>();
   for (const report of reports) {
-    const key = `${report.platform} ${report.build}`;
+    const key = `${report.app ?? ""} ${report.platform} ${report.build}`;
     groups.set(key, [...(groups.get(key) ?? []), report]);
   }
   const summaries = [...groups.values()].map((group): Summary => {
     const devices = [...new Set(group.map((report) => report.device))].sort();
     return {
+      ...(group[0].app ? { app: group[0].app } : {}),
       platform: group[0].platform,
       build: group[0].build,
       reports: group.length,
@@ -461,5 +472,8 @@ export function summarize(reports: PerfReport[]): Summary[] {
       sammyMedia: mediaOf(group),
     };
   });
-  return summaries.sort((a, b) => (a.platform === b.platform ? newerBuild(a.build, b.build) : a.platform === "ios" ? -1 : 1));
+  return summaries.sort((a, b) => {
+    if (a.app !== b.app) return a.app ? 1 : -1;
+    return a.platform === b.platform ? newerBuild(a.build, b.build) : a.platform === "ios" ? -1 : 1;
+  });
 }

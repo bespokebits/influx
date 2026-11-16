@@ -5,8 +5,10 @@
 //
 //   scripts/perf-report.mjs [days] [--json]   days: 1 to 90, default 30
 //
-// It reads GET /perf/reports from the OAuth Worker and prints, per platform
-// and build, the reports, the hitch median and worst, and launch p50 and p90.
+// It reads GET /perf/reports from the OAuth Worker and prints, per app,
+// platform and build, the reports, the hitch median and worst, and launch
+// p50 and p90. Influx Preview's builds (ADR 0042) are numbered apart from
+// Influx's, and are listed after them, named as Preview's.
 // A figure is judged only with evidence: hitches (the median report's) from
 // at least 3 reports that measured scrolling on the iPhone 15 Pro Max
 // (iPhone16,2), the phone the bar is set on (the Mac sends none; other
@@ -127,7 +129,7 @@ for (const summary of summaries) {
   const hitch = summary.scrollHitchMsPerS;
   console.log(
     [
-      `${summary.platform} build ${summary.build}: ${summary.reports} report${summary.reports === 1 ? "" : "s"}`,
+      `${summary.app === "preview" ? "Preview " : ""}${summary.platform} build ${summary.build}: ${summary.reports} report${summary.reports === 1 ? "" : "s"}`,
       `  hitches: median ${show(hitch.median, "ms/s")}, worst ${show(hitch.worst, "ms/s")} (${hitch.reports} measured)`,
       ...(summary.scrollHitchByDevice ?? [])
         .filter((entry) => entry.reports > 0)

@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { createWorker, type Env } from "../src/index.ts";
 import { PERF_DAILY_LIMIT, PERF_RETENTION_DAYS } from "../src/objects.ts";
 import { median, mergeBuckets, percentile, summarize, type PerfReport } from "../src/perf.ts";
-import { attestEnv, b64, ecKeys, enc, makeAssertion, makeAttestation, makePki, RELEASE, TEAM, type Keys, type Launch } from "./helpers.ts";
+import { attestEnv, b64, ecKeys, enc, makeAssertion, makeAttestation, makePki, PREVIEW, RELEASE, TEAM, type Keys, type Launch } from "./helpers.ts";
 
 const ORIGIN = "https://influx.bespokebits.dev";
 const pki = await makePki();
@@ -55,18 +55,18 @@ async function newChallenge(env: Env): Promise<string> {
 
 type Key = { keyId: string; leaf: Keys; appId: string };
 
-async function registered(env: Env): Promise<Key> {
+async function registered(env: Env, bundle = RELEASE): Promise<Key> {
   const challenge = await newChallenge(env);
-  const made = await makeAttestation(pki, { challenge });
+  const made = await makeAttestation(pki, { challenge, bundle });
   const response = await worker.fetch(
     new Request(`${ORIGIN}/oauth/register`, {
       method: "POST",
-      body: JSON.stringify({ platform: "ios", appId: RELEASE, keyId: b64(made.keyId), attestation: b64(made.attestation), challenge }),
+      body: JSON.stringify({ platform: "ios", appId: bundle, keyId: b64(made.keyId), attestation: b64(made.attestation), challenge }),
     }),
     env,
   );
   assert.equal(response.status, 201);
-  return { keyId: ((await response.json()) as { keyId: string }).keyId, leaf: made.leaf, appId: `${TEAM}.${RELEASE}` };
+  return { keyId: ((await response.json()) as { keyId: string }).keyId, leaf: made.leaf, appId: `${TEAM}.${bundle}` };
 }
 
 /** A report as the app sends one: a fresh challenge beside it, attested by `key` unless it is nil. */
@@ -389,6 +389,27 @@ test("median and percentiles", () => {
       { startMs: 0, endMs: 100, count: 5 },
       { startMs: 100, endMs: 200, count: 1 },
     ],
+  );
+});
+
+test("a report from Influx Preview is kept as Preview's, by its attested key and not by what it says", async () => {
+  const { env, perf } = await attestEnv();
+  const preview = await registered(env, PREVIEW);
+  assert.equal((await worker.fetch(await reportRequest(env, preview, 1), env)).status, 204);
+  const [kept] = stored(perf);
+  const { receivedAt: _, ...report } = kept;
+  assert.deepEqual(report, { ...REPORT, app: "preview" });
+  // A report may not name its own app: Influx can't pass for Preview, nor Preview for Influx.
+  const influx = await registered(env);
+  await expectError(await worker.fetch(await reportRequest(env, influx, 1, { report: { ...REPORT, app: "preview" } }), env), 400, "invalid_report");
+  await expectError(await worker.fetch(await reportRequest(env, preview, 2, { report: { ...REPORT, app: "influx" } }), env), 400, "invalid_report");
+  // Influx's own report, of the same build number, is summarized apart from Preview's.
+  const another = { ...REPORT, id: crypto.randomUUID().toUpperCase() };
+  assert.equal((await worker.fetch(await reportRequest(env, influx, 1, { report: another }), env)).status, 204);
+  const { summaries } = (await (await read(env)).json()) as { summaries: { app?: string; build: string; reports: number }[] };
+  assert.deepEqual(
+    summaries.map((s) => [s.app, s.build, s.reports]),
+    [[undefined, REPORT.build, 1], ["preview", REPORT.build, 1]],
   );
 });
 

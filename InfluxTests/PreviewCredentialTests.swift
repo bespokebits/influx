@@ -29,3 +29,13 @@ import InfluxKit
         #expect(CallerAttestation.keyService(bundleID: nil) == "dev.bespokebits.influx.app-attest")
     }
 }
+
+/// Influx and Influx Preview send field performance reports; the builds
+/// that never ship through TestFlight don't (ADR 0034, 0042).
+@MainActor @Test func onlyTheAppsThatShipThroughTestFlightReportPerformance() {
+    #expect(FieldPerformance.reports(bundleID: "dev.bespokebits.influx"))
+    #expect(FieldPerformance.reports(bundleID: "dev.bespokebits.influx.preview"))
+    for other in ["dev.bespokebits.influx.dev", "dev.bespokebits.influx.uitest", "dev.bespokebits.influx.perf", nil] {
+        #expect(!FieldPerformance.reports(bundleID: other))
+    }
+}

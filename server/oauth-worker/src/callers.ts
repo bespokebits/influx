@@ -259,10 +259,28 @@ export async function callerAttestation(
   body: Record<string, unknown>,
   env: Env,
   options: Options = {},
-): Promise<"none" | "attested" | "unknown" | "policy" | "refused"> {
+): Promise<Attested> {
+  return (await attestedCaller(request, raw, body, env, options)).attested;
+}
+
+type Attested = "none" | "attested" | "unknown" | "policy" | "refused";
+
+/**
+ * `callerAttestation`, and for an attested caller the bundle ID its key was
+ * registered for: which app is asking, as Apple attested it, not as the
+ * request says.
+ */
+export async function attestedCaller(
+  request: Request,
+  raw: Uint8Array,
+  body: Record<string, unknown>,
+  env: Env,
+  options: Options = {},
+): Promise<{ attested: Attested; appId?: string }> {
+  const answer = (attested: Attested) => ({ attested });
   const keyHeader = request.headers.get(KEY_HEADER);
   const assertionHeader = request.headers.get(ASSERTION_HEADER);
-  if (keyHeader === null && assertionHeader === null) return "none";
+  if (keyHeader === null && assertionHeader === null) return answer("none");
   try {
     if (!keyHeader || !assertionHeader) refuse("headers: incomplete");
     // The body names a challenge from /oauth/challenge, and the assertion
@@ -275,7 +293,7 @@ export async function callerAttestation(
     const found = await key.fetch(new Request("https://key/"));
     if (found.status === 404) {
       await note(env, "assertion: key unknown");
-      return "unknown";
+      return answer("unknown");
     }
     if (found.status !== 200) refuse("keyId: unreadable");
     const record = (await found.json()) as KeyRecord;
@@ -283,7 +301,7 @@ export async function callerAttestation(
     // counts as unknown, so its install registers again under these.
     if (env.REQUIRE_ATTESTATION === "true" && (record.checks ?? 0) < REGISTRATION_CHECKS) {
       await note(env, "assertion: registered under older checks");
-      return "unknown";
+      return answer("unknown");
     }
     // An app since dropped from the list has no environment; the assertion
     // is still checked, so only a genuine one hears it isn't accepted.
@@ -311,11 +329,11 @@ export async function callerAttestation(
     );
     if (advanced.status !== 204) refuse("counter: not increasing");
     if (wantsMetric(env, record, Date.now())) await catchUpMetric(env, options, key, record);
-    return "attested";
+    return { attested: "attested", appId: record.appId };
   } catch (caught) {
     if (caught instanceof Refusal) {
       await note(env, `assertion: ${caught.message}`);
-      return caught.kind === "policy" ? "policy" : "refused";
+      return answer(caught.kind === "policy" ? "policy" : "refused");
     }
     throw caught;
   }
