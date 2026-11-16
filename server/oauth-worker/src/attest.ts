@@ -316,9 +316,14 @@ function acceptLaunchContext(context: LaunchContext, environment: "production" |
   }
 }
 
-/** A dotted numeric version, such as "0.1.0", as its numbers. */
+/**
+ * A dotted numeric version, such as "0.1.0", as its numbers. Apple puts the
+ * build number here, and a build number may be a time: Influx Preview's is
+ * the minute, ten digits (ADR 0042). A part may have twelve digits, a time
+ * to the second, which a JavaScript number still holds exactly.
+ */
 function parseVersion(text: string): number[] {
-  if (!/^\d{1,9}(\.\d{1,9})*$/.test(text)) refusePolicy("extensions: bundle version malformed");
+  if (!/^\d{1,12}(\.\d{1,12})*$/.test(text)) refusePolicy("extensions: bundle version malformed");
   return text.split(".").map(Number);
 }
 

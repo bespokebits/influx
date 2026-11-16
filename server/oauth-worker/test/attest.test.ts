@@ -362,10 +362,11 @@ test("an attestation's bundle version must be present and not below the minimum"
   const version = (bundleVersion: string | null, minBundleVersion?: string) =>
     input({ challenge: CHALLENGE, launch: { bundleVersion }, ...(minBundleVersion === undefined ? {} : { minBundleVersion }) });
   const passes = async (made: Promise<Attestation>) => assert.equal((await verifyAttestation(await made, pki.roots)).bundleVersion !== undefined, true);
-  for (const accepted of ["0.1.0", "0.1", "0.1.1", "0.2", "1.0.0", "10.0"]) await passes(version(accepted));
+  // A build number that is a time, to the minute or the second, is a version too.
+  for (const accepted of ["0.1.0", "0.1", "0.1.1", "0.2", "1.0.0", "10.0", "18", "2611162154", "261116215400"]) await passes(version(accepted));
   await refusedFor(version(null).then((i) => verifyAttestation(i, pki.roots)), /bundle version missing/);
   for (const old of ["0.0.9", "0.0", "0"]) await refusedFor(version(old).then((i) => verifyAttestation(i, pki.roots)), /too old/, old);
-  for (const bad of ["", "one", "0.1.0-beta", "0..1", "v0.1", " 0.1"]) {
+  for (const bad of ["", "one", "0.1.0-beta", "0..1", "v0.1", " 0.1", "2611162154000"]) {
     await refusedFor(version(bad).then((i) => verifyAttestation(i, pki.roots)), /malformed/, JSON.stringify(bad));
   }
   // Without a minimum, presence is enough.
