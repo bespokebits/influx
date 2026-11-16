@@ -12,6 +12,13 @@
 //   scripts/testflight.mjs submit <build> <file>        send a build to the public group and Beta App Review
 //   scripts/testflight.mjs public-link <limit>          open the public group's link to at most <limit> testers
 //
+// Influx Preview, the app development builds ship as (ADR 0042), is built
+// and uploaded by scripts/preview-testflight.sh, not by Xcode Cloud. Here:
+//
+//   scripts/testflight.mjs preview-setup                make its internal group, with Influx's internal testers
+//   scripts/testflight.mjs preview-status               its newest builds
+//   scripts/testflight.mjs preview-wait <build>         until both platforms' builds of that number reach testers
+//
 // The account's Xcode Cloud products share one build lane, so `start` refuses
 // (exit 3) while a run of any product is in progress, this one's included,
 // and says which. `--anyway` starts regardless.
@@ -42,6 +49,12 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 const BUNDLE_ID = "dev.bespokebits.influx";
+const PREVIEW_BUNDLE_ID = "dev.bespokebits.influx.preview";
+/** The internal testers' group, under this name in both apps. */
+const INTERNAL_GROUP = "Internal";
+/** How long `preview-wait` waits for an upload to show up at all, and for its builds to reach testers. */
+const UPLOAD_MINUTES = 30;
+const PROCESSING_MINUTES = 90;
 const WORKFLOW = "TestFlight (manual)";
 const API = "https://api.appstoreconnect.apple.com";
 const POLL_SECONDS = 60;
@@ -98,12 +111,16 @@ function token() {
   return `${unsigned}.${signature}`;
 }
 
-async function api(path, init = {}) {
+function request(path, init = {}) {
   if (!jwt || Date.now() / 1000 > jwtExpires - 60) jwt = token();
-  const response = await fetch(`${API}${path}`, {
+  return fetch(`${API}${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json", ...init.headers },
   });
+}
+
+async function api(path, init = {}) {
+  const response = await request(path, init);
   if (!response.ok) {
     const detail = (await response.text()).slice(0, 400);
     fail(`${init.method ?? "GET"} ${path} answered ${response.status}: ${detail}`);
@@ -204,13 +221,128 @@ async function buildsOf(run) {
   // they are read again by ID.
   const ids = (await api(`/v1/ciBuildRuns/${run.id}/builds`)).data.map((b) => b.id);
   if (ids.length === 0) return [];
-  const builds = await api(`/v1/builds?filter[id]=${ids.join(",")}&include=preReleaseVersion,buildBetaDetail`);
+  return buildStates(await api(`/v1/builds?filter[id]=${ids.join(",")}&include=preReleaseVersion,buildBetaDetail`));
+}
+
+/** Each build of a `/v1/builds` answer that includes its version and beta detail. */
+function buildStates(builds) {
   const included = Object.fromEntries((builds.included ?? []).map((i) => [`${i.type}:${i.id}`, i.attributes]));
   return builds.data.map((b) => {
     const version = included[`preReleaseVersions:${b.relationships.preReleaseVersion?.data?.id}`] ?? {};
     const beta = included[`buildBetaDetails:${b.relationships.buildBetaDetail?.data?.id}`] ?? {};
     return { platform: version.platform ?? "?", version: version.version ?? "?", build: b.attributes.version, processing: b.attributes.processingState, testing: beta.internalBuildState ?? "?" };
   });
+}
+
+const buildLine = (b) => `TestFlight ${b.platform} ${b.version} (${b.build}): ${b.processing}, internal ${b.testing}`;
+const buildsReady = (builds) => builds.every((b) => b.processing === "VALID" && b.testing === "IN_BETA_TESTING");
+const buildsFailed = (builds) => builds.some((b) => FAILED_PROCESSING.has(b.processing) || FAILED_TESTING.has(b.testing));
+
+/** Influx Preview's App Store Connect app. The record is made once, by hand: the API can't make one. */
+async function previewApp() {
+  const apps = await api(`/v1/apps?filter[bundleId]=${PREVIEW_BUNDLE_ID}`);
+  const app = apps.data.find((a) => a.attributes.bundleId === PREVIEW_BUNDLE_ID);
+  if (!app) fail(`no App Store Connect app for ${PREVIEW_BUNDLE_ID}; make it in App Store Connect first`);
+  return app;
+}
+
+/** An app's internal testers' group, or undefined. */
+async function internalGroup(appID) {
+  return (await api(`/v1/apps/${appID}/betaGroups?limit=200`)).data
+    .find((g) => g.attributes.isInternalGroup && g.attributes.name === INTERNAL_GROUP);
+}
+
+/** Makes Preview's internal group, which gets every build, and puts
+ *  Influx's internal testers in it. Safe to run again. Prints counts only. */
+async function previewSetup() {
+  const preview = await previewApp();
+  let group = await internalGroup(preview.id);
+  if (!group) {
+    group = (await api("/v1/betaGroups", {
+      method: "POST",
+      body: JSON.stringify({
+        data: {
+          type: "betaGroups",
+          attributes: { name: INTERNAL_GROUP, isInternalGroup: true, hasAccessToAllBuilds: true },
+          relationships: { app: { data: { type: "apps", id: preview.id } } },
+        },
+      }),
+    })).data;
+    console.log(`group "${INTERNAL_GROUP}": made`);
+  } else {
+    console.log(`group "${INTERNAL_GROUP}": there already`);
+  }
+  const { app: influx } = await product();
+  const source = await internalGroup(influx.id);
+  if (!source) fail(`Influx has no group "${INTERNAL_GROUP}" to copy testers from`);
+  const wanted = (await api(`/v1/betaGroups/${source.id}/betaTesters?limit=200`)).data;
+  const have = (await api(`/v1/betaGroups/${group.id}/betaTesters?limit=200`)).data;
+  const known = new Set(have.flatMap((t) => [t.id, t.attributes.email?.toLowerCase()]));
+  const missing = wanted.filter((t) => !known.has(t.id) && !known.has(t.attributes.email?.toLowerCase()));
+  let added = 0;
+  for (const tester of missing) {
+    // A tester record belongs to the apps it tests, so one of Influx's may
+    // not be assignable here; the person is then added by their address.
+    const byRecord = await request(`/v1/betaGroups/${group.id}/relationships/betaTesters`, {
+      method: "POST",
+      body: JSON.stringify({ data: [{ type: "betaTesters", id: tester.id }] }),
+    });
+    const a = tester.attributes;
+    const result = byRecord.ok ? byRecord : await request("/v1/betaTesters", {
+      method: "POST",
+      body: JSON.stringify({
+        data: {
+          type: "betaTesters",
+          attributes: { email: a.email, firstName: a.firstName, lastName: a.lastName },
+          relationships: { betaGroups: { data: [{ type: "betaGroups", id: group.id }] } },
+        },
+      }),
+    });
+    if (result.ok) added++;
+    else console.log(`a tester could not be added: ${result.status} ${JSON.parse(await result.text()).errors?.[0]?.detail ?? ""}`);
+  }
+  console.log(`testers: ${wanted.length} in Influx's group, ${have.length} here already, ${added} added`);
+  if (added < missing.length) process.exit(1);
+}
+
+/** Preview's builds of one number, or its newest when no number is given. */
+async function previewBuilds(number) {
+  const preview = await previewApp();
+  const which = number ? `&filter[version]=${number}` : "&sort=-uploadedDate";
+  return buildStates(await api(`/v1/builds?filter[app]=${preview.id}${which}&limit=6&include=preReleaseVersion,buildBetaDetail`));
+}
+
+async function previewStatus() {
+  const builds = await previewBuilds();
+  if (builds.length === 0) console.log("Influx Preview has no builds yet");
+  for (const b of builds) console.log(buildLine(b));
+}
+
+/** Waits until the iOS and macOS builds of `number` are with the internal
+ *  testers. Exits 1 when one fails, or when either hasn't shown up
+ *  UPLOAD_MINUTES after the wait began: an upload App Store Connect refuses
+ *  after accepting the file never becomes a build. It also gives up after
+ *  PROCESSING_MINUTES, so builds that no group takes never hold it open. */
+async function previewWait(number) {
+  const started = Date.now();
+  const deadline = started + UPLOAD_MINUTES * 60_000;
+  for (;;) {
+    const builds = await previewBuilds(number);
+    const both = ["IOS", "MAC_OS"].every((p) => builds.some((b) => b.platform === p));
+    if ((both && buildsReady(builds)) || buildsFailed(builds)) {
+      for (const b of builds) console.log(buildLine(b));
+      process.exit(buildsFailed(builds) ? 1 : 0);
+    }
+    if (!both && Date.now() > deadline) {
+      for (const b of builds) console.log(buildLine(b));
+      fail(`build ${number} has not shown up for both platforms after ${UPLOAD_MINUTES} minutes`, 1);
+    }
+    if (Date.now() > started + PROCESSING_MINUTES * 60_000) {
+      for (const b of builds) console.log(buildLine(b));
+      fail(`build ${number} has not reached the internal testers after ${PROCESSING_MINUTES} minutes`, 1);
+    }
+    await new Promise((resolve) => setTimeout(resolve, POLL_SECONDS * 1000));
+  }
 }
 
 /** What external testing needs, read only: test information, the Beta App
@@ -414,7 +546,7 @@ async function status() {
   const { product: ciProduct } = await product();
   for (const run of await runs(ciProduct.id, 3)) {
     console.log((await describe(run)).join("\n"));
-    for (const b of await buildsOf(run)) console.log(`  TestFlight ${b.platform} ${b.version} (${b.build}): ${b.processing}, internal ${b.testing}`);
+    for (const b of await buildsOf(run)) console.log(`  ${buildLine(b)}`);
   }
 }
 
@@ -443,10 +575,10 @@ async function wait(number) {
       // The builds then process in App Store Connect before testers get them.
       for (;;) {
         const builds = await buildsOf(run);
-        const ready = builds.length > 0 && builds.every((b) => b.processing === "VALID" && b.testing === "IN_BETA_TESTING");
-        const failed = builds.some((b) => FAILED_PROCESSING.has(b.processing) || FAILED_TESTING.has(b.testing));
+        const ready = builds.length > 0 && buildsReady(builds);
+        const failed = buildsFailed(builds);
         if (ready || failed) {
-          for (const b of builds) console.log(`TestFlight ${b.platform} ${b.version} (${b.build}): ${b.processing}, internal ${b.testing}`);
+          for (const b of builds) console.log(buildLine(b));
           process.exit(ready ? 0 : 1);
         }
         await new Promise((r) => setTimeout(r, POLL_SECONDS * 1000));
@@ -456,15 +588,15 @@ async function wait(number) {
   }
 }
 
-const USAGE = "usage: scripts/testflight.mjs start [branch] [--dry-run] [--anyway] | status | lane | external | prepare | submit <build> <what-to-test file> | public-link <limit> | wait <run number>";
+const USAGE = "usage: scripts/testflight.mjs start [branch] [--dry-run] [--anyway] | status | lane | external | prepare | submit <build> <what-to-test file> | public-link <limit> | wait <run number> | preview-setup | preview-status | preview-wait <build>";
 const [command, ...rest] = process.argv.slice(2);
 const flags = rest.filter((r) => r.startsWith("-"));
 const args = rest.filter((r) => !r.startsWith("-"));
 // Anything unexpected is refused before any request: a mistyped --dry-run
 // must not start a real build.
 const allowedFlags = command === "start" ? ["--dry-run", "--anyway"] : [];
-const maxArgs = { start: 1, status: 0, lane: 0, external: 0, prepare: 0, submit: 2, "public-link": 1, wait: 1 }[command];
-const minArgs = { submit: 2, "public-link": 1, wait: 1 }[command] ?? 0;
+const maxArgs = { start: 1, status: 0, lane: 0, external: 0, prepare: 0, submit: 2, "public-link": 1, wait: 1, "preview-setup": 0, "preview-status": 0, "preview-wait": 1 }[command];
+const minArgs = { submit: 2, "public-link": 1, wait: 1, "preview-wait": 1 }[command] ?? 0;
 if (maxArgs === undefined || args.length > maxArgs || args.length < minArgs || flags.some((f) => !allowedFlags.includes(f))) fail(USAGE);
 switch (command) {
   case "start":
@@ -493,6 +625,16 @@ switch (command) {
     await publicLink(limit);
     break;
   }
+  case "preview-setup":
+    await previewSetup();
+    break;
+  case "preview-status":
+    await previewStatus();
+    break;
+  case "preview-wait":
+    if (!/^\d+$/.test(args[0])) fail(USAGE);
+    await previewWait(args[0]);
+    break;
   case "wait": {
     const number = /^\d+$/.test(args[0] ?? "") ? Number(args[0]) : NaN;
     if (!Number.isInteger(number)) fail(USAGE);
