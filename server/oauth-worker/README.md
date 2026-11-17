@@ -15,7 +15,19 @@ The hosts are `HOSTS` in `src/index.ts` and the `routes` in `wrangler.toml`; kee
 | `GET /oauth/usage` | `{"day", "count", "limit", "attested", "unattested", "events"}`: today's assertions against the daily limit (UTC), for a volume alert, and how many of them came from attested callers. `events` counts the day's challenges, registrations by platform, refused registrations and assertions by the check that failed, and unattested requests by source (the app, the deploy check, or other), so a rollout shows whether installs attest. Reading it counts nothing. | the Worker |
 | `POST /perf/report` | Stores one field performance report from an attested TestFlight install, below. | the Worker |
 | `GET /perf/reports?days=N` | `{"days", "reports", "summaries"}`: the last N UTC days' reports (1 to 90, default 30), newest first, and a summary per platform and build, below. Reports hold nothing about who sent them; reading them counts nothing. | the Worker |
-| `/.well-known/apple-app-site-association` | The app IDs allowed to take the callback, for the release, dev and UI-test bundle IDs under both app names (`dev.bespokebits.influx…` since the rename, `dev.bespokebits.flux…` until no installed build uses it), the same file on both hosts, served as `application/json` (by the `public/_headers` rule and by the Worker). It uses the current signing team, KV99MN4F58; regenerate it from `apple-app-site-association.template.json` when the Bespoke Bits team arrives. | `public/.well-known/` |
+| `/.well-known/apple-app-site-association` | The app IDs allowed to take the callback, for the release, Preview, dev and UI-test bundle IDs under both app names (`dev.bespokebits.influx…` since the rename, `dev.bespokebits.flux…` until no installed build uses it), the same file on both hosts, served as `application/json` (by the `public/_headers` rule and by the Worker). It uses the current signing team, KV99MN4F58; regenerate it from `apple-app-site-association.template.json` when the Bespoke Bits team arrives. List a new app ID at least a day before its first build is installed, below. | `public/.well-known/` |
+
+## Adding an app to the site-association file
+
+A device does not read the file from this Worker. It asks Apple's cache (`https://app-site-association.cdn-apple.com/a/v1/<host>`), which keeps its copy for up to six hours. The device asks when the app is installed or updated, and after that about once a week. An app that the list did not name at that moment can't take the callback, so its Bluesky sign-in window can't open ("The sign-in window couldn't open"), and it stays that way until the device asks again.
+
+So add the app ID to the file and the template, deploy, and wait a day before the first build of that app is installed. Check that Apple's cache names it first:
+
+```sh
+curl -s https://app-site-association.cdn-apple.com/a/v1/influx.bespokebits.dev | grep <bundle ID>
+```
+
+If a build was installed too soon, send an update of that app once the cache names it. Installing the update makes the device ask again.
 
 ## Configuration
 
