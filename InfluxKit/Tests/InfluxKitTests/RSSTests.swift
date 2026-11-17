@@ -354,6 +354,28 @@ private let feedSource = Source(id: "rss:https://sixcolors.com/feed/", kind: .rs
         #expect(try await self.items(xml)[1].remoteID == items[1].remoteID)
     }
 
+    @Test func summariesEscapedTwiceLoseTheirTags() async throws {
+        func body(_ description: String) async throws -> String {
+            let xml = "<rss><channel><item><guid isPermaLink=\"false\">1</guid><title>T</title><description>\(description)</description></item></channel></rss>"
+            return try await items(xml)[0].body
+        }
+        // Escaped markup inside CDATA: the tags go, the entities decode.
+        #expect(try await body("<![CDATA[&lt;i&gt;Show&lt;/i&gt; host &amp;#8220;quoted&amp;#8221;]]>") == "Show host “quoted”")
+        // The same, escaped twice without CDATA.
+        #expect(try await body("&amp;lt;em&amp;gt;Show&amp;lt;/em&amp;gt; text") == "Show text")
+        // Writing about a tag keeps it: no closing tag.
+        #expect(try await body("The &amp;lt;dialog&amp;gt; element") == "The <dialog> element")
+        // A summary with real markup is read as it is.
+        #expect(try await body("<![CDATA[<p>Use <code>&lt;em&gt;x&lt;/em&gt;</code></p>]]>") == "Use <em>x</em>")
+    }
+
+    @Test func doubleEscapingIsOnlyUndoneWhenItIsMarkup() {
+        #expect(HTMLText.unescapingDoubleEscapedMarkup("&lt;i&gt;Show&lt;/i&gt;") == "<i>Show</i>")
+        #expect(HTMLText.unescapingDoubleEscapedMarkup("a &lt;/ b &gt; c") == "a &lt;/ b &gt; c")
+        #expect(HTMLText.unescapingDoubleEscapedMarkup("&lt;b>x&lt;/b>") == "&lt;b>x&lt;/b>")
+        #expect(HTMLText.unescapingDoubleEscapedMarkup("1 < 2 &lt;/i&gt;") == "1 < 2 </i>")
+    }
+
     @Test func bareGUIDsAreNotLinks() async throws {
         let xml = "<rss><channel><item><guid>42</guid><title>Hello</title></item></channel></rss>"
         let item = try await items(xml)[0]

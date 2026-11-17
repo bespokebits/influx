@@ -50,6 +50,38 @@ enum HTMLText {
         text.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
     }
 
+    /// `html` decoded once more when a feed escaped its markup twice, as
+    /// some do by putting already-escaped HTML inside CDATA
+    /// ("&lt;i&gt;Show&lt;/i&gt;"); otherwise `html` as it is. The same
+    /// characters are also how a feed writes a literal tag, so this decodes
+    /// only text with no tags of its own and at least one escaped closing
+    /// tag, which writing about a tag rarely has.
+    static func unescapingDoubleEscapedMarkup(_ html: String) -> String {
+        guard html.contains("&lt;/"), !hasTag(html), hasEscapedClosingTag(html) else { return html }
+        return decodeEntities(html)
+    }
+
+    private static func hasTag(_ html: String) -> Bool {
+        var rest = html[...]
+        while let open = rest.firstIndex(of: "<") {
+            rest = rest[rest.index(after: open)...]
+            if startsTag(rest), rest.contains(">") { return true }
+        }
+        return false
+    }
+
+    /// Whether `html` holds "&lt;/name&gt;" for a tag name of letters and
+    /// digits.
+    private static func hasEscapedClosingTag(_ html: String) -> Bool {
+        var rest = html[...]
+        while let start = rest.range(of: "&lt;/") {
+            rest = rest[start.upperBound...]
+            let name = rest.prefix { $0.isASCII && ($0.isLetter || $0.isNumber) }
+            if let first = name.first, first.isLetter, rest.dropFirst(name.count).hasPrefix("&gt;") { return true }
+        }
+        return false
+    }
+
     /// Whether the text after a "<" is a tag rather than a bare "<".
     private static func startsTag(_ rest: Substring) -> Bool {
         guard let next = rest.first else { return false }

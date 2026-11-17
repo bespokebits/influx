@@ -203,10 +203,14 @@ enum ArticleMapper {
         // Where the row opens; unlike `url`, never a merge key.
         let opens = url ?? entry.externalLink.flatMap { resolve($0, against: feedURL) }
         let title = entry.title.map { HTMLText.plainText($0) }.flatMap { $0.isEmpty ? nil : $0 }
-        // The summary first: content is often the whole article.
+        // The summary first: content is often the whole article. An XML
+        // feed's may be escaped twice; JSON Feed's plain text is escaped
+        // here on purpose, so it is read only once.
+        let isXML = feed.format != .json
         let body = [entry.summary, entry.content]
             .lazy
-            .compactMap { $0.map { HTMLText.plainText($0, limit: RSSConnector.summaryLimit) } }
+            .compactMap { $0 }
+            .map { HTMLText.plainText(isXML ? HTMLText.unescapingDoubleEscapedMarkup($0) : $0, limit: RSSConnector.summaryLimit) }
             .first { !$0.isEmpty } ?? ""
         guard title != nil || !body.isEmpty else { return nil }
 
