@@ -25,12 +25,16 @@ struct DeviceAppAttest: AppAttestService {
     }
 
     /// A key this device no longer has (after a reinstall or a restore)
-    /// becomes `AppAttestError.invalidKey`, so a new one is registered.
+    /// becomes `AppAttestError.invalidKey`, so a new one is registered. Any
+    /// other DeviceCheck failure becomes `AppAttestError.failed` with its
+    /// code, which the request that then goes unattested names.
     private static func mapped<Value>(_ work: () async throws -> Value) async throws -> Value {
         do {
             return try await work()
         } catch let error as DCError where error.code == .invalidKey {
             throw AppAttestError.invalidKey
+        } catch let error as DCError {
+            throw AppAttestError.failed(code: error.code.rawValue)
         }
     }
 }

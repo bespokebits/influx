@@ -21,13 +21,18 @@ private final class FakeAppAttest: AppAttestService, @unchecked Sendable {
     }
 
     let isSupported: Bool
+    /// What making a key, or an assertion, throws every time, if anything.
+    let keyFailure: AppAttestError?
+    let assertionFailure: AppAttestError?
     private let lock = NSLock()
     private var made = 0
     private var _calls: [Call] = []
     private var _invalid: Set<String> = []
 
-    init(isSupported: Bool = true) {
+    init(isSupported: Bool = true, keyFailure: AppAttestError? = nil, assertionFailure: AppAttestError? = nil) {
         self.isSupported = isSupported
+        self.keyFailure = keyFailure
+        self.assertionFailure = assertionFailure
     }
 
     var calls: [Call] { lock.withLock { _calls } }
@@ -39,7 +44,8 @@ private final class FakeAppAttest: AppAttestService, @unchecked Sendable {
     }
 
     func generateKey() async throws -> String {
-        lock.withLock {
+        if let keyFailure { throw keyFailure }
+        return lock.withLock {
             made += 1
             return "key-\(made)"
         }
@@ -51,7 +57,8 @@ private final class FakeAppAttest: AppAttestService, @unchecked Sendable {
     }
 
     func generateAssertion(_ keyID: String, clientDataHash: Data) async throws -> Data {
-        try lock.withLock {
+        if let assertionFailure { throw assertionFailure }
+        return try lock.withLock {
             if _invalid.contains(keyID) { throw AppAttestError.invalidKey }
             _calls.append(Call(kind: "assert", keyID: keyID, hash: clientDataHash))
             return Data("assertion:\(keyID):\(_calls.count)".utf8)
@@ -109,6 +116,11 @@ private final class FakeWorker: @unchecked Sendable {
             }
         }
     }
+}
+
+/// Why each request went without attestation, nil for one that didn't say.
+private func reasons(_ http: FakeHTTPClient) -> [String?] {
+    http.requests.filter { $0.url?.path == "/oauth/assertion" }.map { $0.value(forHTTPHeaderField: "X-Influx-Unattested") }
 }
 
 private func paths(_ http: FakeHTTPClient) -> [String] {
@@ -347,6 +359,7 @@ private func fakeHash(_ data: Data) -> Data {
         #expect(attest.keysMade == 1)
         #expect(paths(worker.http) == ["challenge", "assertion", "challenge", "register", "challenge", "assertion"])
         #expect(worker.http.requests.last?.value(forHTTPHeaderField: "X-Influx-Key") == "key-1")
+        #expect(reasons(worker.http) == ["challenge-refused", nil])
     }
 
     @Test func aKeyThePlatformLostIsReplaced() async throws {
@@ -375,6 +388,7 @@ private func fakeHash(_ data: Data) -> Data {
         // Not again in this run: each try would make a key Apple counts.
         _ = try await signing.assertion(for: "https://auth.example.com", keyID: nil)
         #expect(paths(worker.http).suffix(1) == ["assertion"])
+        #expect(reasons(worker.http) == ["register-refused", "register-refused"])
         #expect(attest.keysMade == 1)
         #expect(try storedKey(keys) == nil)
     }
@@ -389,6 +403,43 @@ private func fakeHash(_ data: Data) -> Data {
         #expect(request.value(forHTTPHeaderField: "X-Influx-Assertion") == nil)
         #expect(try json(request) == ["aud": "https://auth.example.com", "kid": "client-key"])
         #expect(attest.keysMade == 0)
+        #expect(reasons(worker.http) == ["unsupported"])
+    }
+
+    /// A platform that can't make an assertion with the registered key:
+    /// the request goes without attestation, naming the step and the
+    /// platform's error code, so the Worker's counts show it.
+    @Test func aFailedAssertionSaysWhyTheRequestIsUnattested() async throws {
+        let worker = FakeWorker()
+        let attest = FakeAppAttest(assertionFailure: .failed(code: 2))
+        let signing = service(worker.http, attest, keys: try keysHolding("key"))
+        for _ in 0..<2 {
+            _ = try await signing.assertion(for: "https://auth.example.com", keyID: nil)
+        }
+        #expect(paths(worker.http) == ["challenge", "assertion", "challenge", "assertion"])
+        #expect(worker.http.requests.allSatisfy { $0.value(forHTTPHeaderField: "X-Influx-Key") == nil })
+        #expect(reasons(worker.http) == ["assert-failed-dc2", "assert-failed-dc2"])
+    }
+
+    /// A key the platform can't make stops registering for the run, and
+    /// every request in it says why. A code too large for the fixed set
+    /// reads as "other".
+    @Test func aKeyThePlatformCannotMakeIsNamedForTheRestOfTheRun() async throws {
+        let worker = FakeWorker()
+        let signing = service(worker.http, FakeAppAttest(keyFailure: .failed(code: 1)))
+        for _ in 0..<2 {
+            _ = try await signing.assertion(for: "https://auth.example.com", keyID: nil)
+        }
+        #expect(paths(worker.http) == ["challenge", "assertion", "assertion"])
+        #expect(reasons(worker.http) == ["key-failed-dc1", "key-failed-dc1"])
+        #expect(CallerAttestation.reason("attest", AppAttestError.failed(code: 42)) == "attest-failed-other")
+        #expect(CallerAttestation.reason("attest", AppAttestError.invalidKey) == "attest-failed-other")
+    }
+
+    @Test func anAttestedRequestNamesNoReason() async throws {
+        let worker = FakeWorker()
+        _ = try await service(worker.http, FakeAppAttest(), keys: try keysHolding("key")).assertion(for: "https://auth.example.com", keyID: nil)
+        #expect(reasons(worker.http) == [nil])
     }
 
     @Test func concurrentRequestsTakeTurns() async throws {

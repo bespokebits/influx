@@ -1,7 +1,7 @@
 // Run with: node --experimental-strip-types --test test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import worker, { clientId, clientMetadata, DailyCount, HOSTS, isPlainHttpsOrigin, SMOKE_AGENT, unattestedSource, type Env } from "../src/index.ts";
+import worker, { clientId, clientMetadata, DailyCount, HOSTS, isPlainHttpsOrigin, SMOKE_AGENT, UNATTESTED_HEADER, unattestedSource, type Env } from "../src/index.ts";
 import { memoryState, memoryStorage } from "./helpers.ts";
 
 const FLUX = "https://flux.bespokebits.dev";
@@ -324,6 +324,23 @@ test("unattested requests are counted by where they came from", () => {
   assert.equal(from("Influx%20Evil/3 CFNetwork/1"), "unattested: other");
   assert.equal(from("curl/8.0"), "unattested: other");
   assert.equal(from(), "unattested: other");
+});
+
+test("an app's unattested request is counted with the reason it gave, if the reason is one it may give", () => {
+  const from = (reason: string, agent = "Influx%20Preview/2611170430 CFNetwork/3860.100.1 Darwin/27.2.0") =>
+    unattestedSource(new Request(`${FLUX}/oauth/assertion`, { method: "POST", headers: { "User-Agent": agent, [UNATTESTED_HEADER]: reason } }));
+  assert.equal(from("assert-failed-dc2"), "unattested: Influx Preview (assert-failed-dc2)");
+  assert.equal(from("key-failed-other"), "unattested: Influx Preview (key-failed-other)");
+  assert.equal(from("register-refused", "Influx/18 CFNetwork/3860.100.1 Darwin/27.2.0"), "unattested: Influx (register-refused)");
+  // The longest fits the day's event names whole.
+  assert.ok(from("register-failed-other").length <= 80);
+  // Anything outside the fixed set is left out, so a caller cannot fill the day's events.
+  for (const reason of ["assert-failed-dc12", "assert-failed-xyz", "anything", "unsupported-dc1", ""]) {
+    assert.equal(from(reason), "unattested: Influx Preview", reason);
+  }
+  // Only the app's names carry one.
+  assert.equal(from("unsupported", "curl/8.0"), "unattested: other");
+  assert.equal(from("unsupported", SMOKE_AGENT), "unattested: deploy check");
 });
 
 test("an unattested request is still counted when attestation is required", async () => {

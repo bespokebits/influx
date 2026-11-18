@@ -6,7 +6,7 @@
 // address or key) is kept.
 
 import { PREVIEW_APP } from "./attest.ts";
-import { attestedCaller, rateLimited, type Options } from "./callers.ts";
+import { attestedCaller, note, rateLimited, type Options } from "./callers.ts";
 import { bodyBytes, error, json, jsonObject } from "./http.ts";
 import type { Env } from "./index.ts";
 import { PERF_RETENTION_DAYS } from "./objects.ts";
@@ -258,22 +258,40 @@ export async function report(request: Request, env: Env, options: Options): Prom
   const body = raw && jsonObject(raw);
   if (!body || !onlyFields(body, new Set(["challenge", "report"]))) return error(400, "invalid_request");
   // Checked before attestation, so a malformed report spends no challenge.
+  // Each outcome from here is counted in the day's events (`/oauth/usage`),
+  // so reports that arrive and are turned away show; the app keeps no log
+  // anyone can read.
   const report = validReport(body.report);
-  if (!report) return error(400, "invalid_report");
+  if (!report) {
+    await note(env, "report: invalid");
+    return error(400, "invalid_report");
+  }
 
   const { attested: attestation, appId } = await attestedCaller(request, raw, body, env, options);
-  if (attestation === "unknown") return error(401, "key_unknown");
+  if (attestation === "unknown") {
+    await note(env, "report: key unknown");
+    return error(401, "key_unknown");
+  }
   if (attestation === "policy") {
+    await note(env, "report: build not accepted");
     // `app_not_accepted` would also stop the app's Bluesky sign-ins for the
     // run, so it is given only once assertions get it too (ADR 0033).
     return env.REQUIRE_ATTESTATION === "true" ? error(403, "app_not_accepted") : error(403, "report_not_accepted");
   }
-  if (attestation !== "attested") return error(401, "attestation_required");
+  if (attestation !== "attested") {
+    await note(env, "report: not attested");
+    return error(401, "attestation_required");
+  }
 
-  const kept = appId === PREVIEW_APP ? { ...report, app: "preview" } : report;
+  const preview = appId === PREVIEW_APP;
+  const kept = preview ? { ...report, app: "preview" } : report;
   const stored = await perfReports(env).fetch(new Request("https://perf/add", { method: "POST", body: JSON.stringify(kept) }));
-  if (stored.status === 429) return error(503, "daily_limit", { "Retry-After": "3600" });
+  if (stored.status === 429) {
+    await note(env, "report: daily limit");
+    return error(503, "daily_limit", { "Retry-After": "3600" });
+  }
   if (stored.status !== 204) return error(503, "unavailable");
+  await note(env, preview ? "report: stored, Influx Preview" : "report: stored");
   return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 }
 

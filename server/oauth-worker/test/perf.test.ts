@@ -139,6 +139,29 @@ test("a report without attestation, or with a forged one, is refused whatever RE
   }
 });
 
+test("each report's outcome is counted in the day's events", async () => {
+  const { env } = await attestEnv({ REQUIRE_ATTESTATION: "true" });
+  const key = await registered(env);
+  const preview = await registered(env, PREVIEW);
+  assert.equal((await worker.fetch(await reportRequest(env, key, 1), env)).status, 204);
+  assert.equal((await worker.fetch(await reportRequest(env, preview, 1), env)).status, 204);
+  assert.equal((await worker.fetch(await reportRequest(env, undefined, 1), env)).status, 401);
+  assert.equal((await worker.fetch(await reportRequest(env, key, 2, { report: { ...REPORT, id: "not-a-uuid" } }), env)).status, 400);
+  assert.equal((await worker.fetch(await reportRequest(env, key, 3, {}, { bundleVersion: "0.0.9" }), env)).status, 403);
+  const unknown = { ...key, keyId: b64(new Uint8Array(32).fill(9)) };
+  assert.equal((await worker.fetch(await reportRequest(env, unknown, 1), env)).status, 401);
+  const usage = (await (await worker.fetch(new Request(`${ORIGIN}/oauth/usage`), env)).json()) as { events: Record<string, number> };
+  const reports = Object.fromEntries(Object.entries(usage.events).filter(([name]) => name.startsWith("report: ")));
+  assert.deepEqual(reports, {
+    "report: stored": 1,
+    "report: stored, Influx Preview": 1,
+    "report: not attested": 1,
+    "report: invalid": 1,
+    "report: build not accepted": 1,
+    "report: key unknown": 1,
+  });
+});
+
 test("a genuine build the Worker doesn't accept is refused without stopping its sign-ins until attestation is required", async () => {
   const old: Launch = { bundleVersion: "0.0.9" };
   const optional = await attestEnv({ REQUIRE_ATTESTATION: "false" });

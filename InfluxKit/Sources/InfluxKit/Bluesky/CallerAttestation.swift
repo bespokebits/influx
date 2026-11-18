@@ -22,6 +22,10 @@ public enum AppAttestError: Error, Hashable, Sendable {
     /// The platform no longer has the key, as after a reinstall or a
     /// restore onto another device: a new one has to be registered.
     case invalidKey
+    /// The platform's service failed otherwise, with this error code
+    /// (`DCError`'s in the app). The request goes without attestation, and
+    /// says why.
+    case failed(code: Int)
 }
 
 /// Proves to the OAuth Worker that a request comes from a genuine Influx
@@ -46,6 +50,10 @@ public actor CallerAttestation {
     static let assertionHeader = "X-Influx-Assertion"
     /// The registered key ID's entry in `keys`.
     static let keyAccount = "app-attest-key"
+    /// On a request that goes without attestation, why: one of a fixed set
+    /// of reasons, which the Worker counts by app, so a failure on a device
+    /// shows without its logs.
+    static let unattestedHeader = "X-Influx-Unattested"
 
     public nonisolated let service: any AppAttestService
     let keys: any CredentialStore
@@ -61,6 +69,9 @@ public actor CallerAttestation {
     /// next launch its requests go unattested, so a failing registration
     /// doesn't make a new key (which Apple counts) on every request.
     private var cannotRegister = false
+    /// Why registering stopped for this run, sent with the requests that
+    /// then go without attestation.
+    private var registerFailure = "register-paused"
     /// Set once the Worker refuses this build (403 `app_not_accepted`). No
     /// new key can fix that, so for the rest of this run every call fails
     /// at once, without asking Apple for a key or the Worker again.
@@ -94,7 +105,7 @@ public actor CallerAttestation {
     /// fails, or the Worker refuses the attestation for anything but
     /// policy) asks without attestation, and the Worker decides.
     public func send(to url: URL, body: @Sendable (_ challenge: String?) throws -> Data) async throws -> (Data, HTTPURLResponse) {
-        guard service.isSupported else { return try await http.send(Self.request(url, try body(nil))) }
+        guard service.isSupported else { return try await unattested(url, body, because: "unsupported") }
         await takeTurn()
         defer { endTurn() }
         try Task.checkCancellation()
@@ -103,8 +114,10 @@ public actor CallerAttestation {
         var registered = false
         var retried = false
         while true {
-            guard let key = try await key(origin: origin, registered: &registered) else {
-                return try await http.send(Self.request(url, try body(nil)))
+            let key: String
+            switch try await self.key(origin: origin, registered: &registered) {
+            case let .key(found): key = found
+            case let .none(reason): return try await unattested(url, body, because: reason)
             }
             var request: URLRequest
             let assertion: Data
@@ -115,14 +128,14 @@ public actor CallerAttestation {
             } catch AppAttestError.invalidKey {
                 // The key is gone from this device: a new one, once.
                 forgetKey()
-                if registered { return try await http.send(Self.request(url, try body(nil))) }
+                if registered { return try await unattested(url, body, because: "key-lost") }
                 continue
             } catch let error as CannotAttest {
                 AuthLog.cannotAttest(error.reason)
-                return try await http.send(Self.request(url, try body(nil)))
+                return try await unattested(url, body, because: error.code)
             } catch let error where Self.isServiceFailure(error) {
                 AuthLog.cannotAttest("assertion: \(error)")
-                return try await http.send(Self.request(url, try body(nil)))
+                return try await unattested(url, body, because: Self.reason("assert", error))
             }
             request.setValue(key, forHTTPHeaderField: Self.keyHeader)
             request.setValue(assertion.base64EncodedString(), forHTTPHeaderField: Self.assertionHeader)
@@ -146,18 +159,28 @@ public actor CallerAttestation {
 
     // MARK: The key
 
+    /// The registered key, or why the request goes without one.
+    private enum KeyLookup {
+        case key(String)
+        case none(reason: String)
+    }
+
     /// The registered key, registering one if there is none and this call
-    /// hasn't registered yet; nil when the request has to go unattested.
-    private func key(origin: URL, registered: inout Bool) async throws -> String? {
-        if let key = storedKey() { return key }
-        guard !registered, !cannotRegister else { return nil }
+    /// hasn't registered yet; otherwise why the request has to go
+    /// unattested.
+    private func key(origin: URL, registered: inout Bool) async throws -> KeyLookup {
+        if let key = storedKey() { return .key(key) }
+        if cannotRegister { return .none(reason: registerFailure) }
+        // This call registered and the key is gone again at once.
+        guard !registered else { return .none(reason: "key-lost") }
         registered = true
+        let failure: String
         do {
             let key = try await register(origin: origin)
             cachedKey = .some(key)
             // Kept in memory for this run even if the keychain refuses it.
             try? keys.setData(Data(key.utf8), for: Self.keyAccount)
-            return key
+            return .key(key)
         } catch {
             // Once a key is made, any failure to register it (throttled,
             // the Worker down, the network gone) stops registering for this
@@ -171,16 +194,24 @@ public actor CallerAttestation {
             case let error as CannotAttest:
                 // The Worker's answer: retried later unless a key was made.
                 AuthLog.cannotAttest(error.reason)
-            case _ where Self.isServiceFailure(error):
+                failure = error.code
+            case let error as PlatformFailure:
                 // Apple's service failed: this device can't attest now, and
                 // asking again each request could make keys.
+                AuthLog.cannotAttest("registration: \(error.underlying)")
+                cannotRegister = true
+                failure = Self.reason(error.step, error.underlying)
+            case _ where Self.isServiceFailure(error):
+                // Anything else that failed the same way.
                 AuthLog.cannotAttest("registration: \(error)")
                 cannotRegister = true
+                failure = "register-failed-other"
             default:
                 throw error
             }
         }
-        return nil
+        if cannotRegister { registerFailure = failure }
+        return .none(reason: failure)
     }
 
     private func storedKey() -> String? {
@@ -206,9 +237,19 @@ public actor CallerAttestation {
             var challenge: String
         }
         let challenge = try await challenge(origin)
-        let key = try await service.generateKey()
+        let key: String
+        do {
+            key = try await service.generateKey()
+        } catch where Self.isServiceFailure(error) {
+            throw PlatformFailure(step: "key", underlying: error)
+        }
         madeUnregisteredKey = true
-        let attestation = try await service.attestKey(key, clientDataHash: sha256(Data(challenge.utf8)))
+        let attestation: Data
+        do {
+            attestation = try await service.attestKey(key, clientDataHash: sha256(Data(challenge.utf8)))
+        } catch where Self.isServiceFailure(error) {
+            throw PlatformFailure(step: "attest", underlying: error)
+        }
         let body = try JSONEncoder().encode(Body(
             platform: platform.rawValue, appId: appID, keyId: key, attestation: attestation.base64EncodedString(), challenge: challenge
         ))
@@ -222,7 +263,9 @@ public actor CallerAttestation {
         case 429, 503:
             throw BlueskyError.rateLimited(until: DPoPRequest.rateLimitReset(response))
         default:
-            throw CannotAttest(reason: "registration: HTTP \(response.statusCode) \(Self.refusal(data, response) ?? "")")
+            throw CannotAttest(
+                reason: "registration: HTTP \(response.statusCode) \(Self.refusal(data, response) ?? "")", code: "register-refused"
+            )
         }
     }
 
@@ -234,7 +277,7 @@ public actor CallerAttestation {
             throw BlueskyError.rateLimited(until: DPoPRequest.rateLimitReset(response))
         }
         guard response.statusCode == 200, let reply = try? JSONDecoder().decode(Reply.self, from: data) else {
-            throw CannotAttest(reason: "challenge: HTTP \(response.statusCode)")
+            throw CannotAttest(reason: "challenge: HTTP \(response.statusCode)", code: "challenge-refused")
         }
         return reply.challenge
     }
@@ -264,6 +307,30 @@ public actor CallerAttestation {
     /// Why this install can't attest a request, which then goes without.
     struct CannotAttest: Error {
         var reason: String
+        /// The reason the request names (`unattestedHeader`).
+        var code: String
+    }
+
+    /// The platform's service failing while registering, at `step`.
+    struct PlatformFailure: Error {
+        var step: String
+        var underlying: any Error
+    }
+
+    /// The reason a platform failure at `step` gives: the platform's error
+    /// code when it has a small one, so the Worker's set stays fixed.
+    static func reason(_ step: String, _ error: any Error) -> String {
+        if case let AppAttestError.failed(code) = error, (0...9).contains(code) { return "\(step)-failed-dc\(code)" }
+        return "\(step)-failed-other"
+    }
+
+    /// Sends the request without attestation, naming why.
+    private func unattested(
+        _ url: URL, _ body: @Sendable (_ challenge: String?) throws -> Data, because reason: String
+    ) async throws -> (Data, HTTPURLResponse) {
+        var request = Self.request(url, try body(nil))
+        request.setValue(reason, forHTTPHeaderField: Self.unattestedHeader)
+        return try await http.send(request)
     }
 
     /// A failure of the platform's App Attest service, as opposed to one
