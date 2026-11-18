@@ -38,7 +38,7 @@ import InfluxKit
 
     /// A row that arrives late, dated above what the reader has read, goes
     /// below it (ADR 0041), and still shows when it was posted, then an
-    /// arrow and where it sits (#261).
+    /// arrow and when it arrived (#261, #282).
     @Test func aLateRowHeldBelowWhatWasReadShowsWhenItWasPosted() async throws {
         let store = try InfluxStore.inMemory()
         try await store.save(sources: [Source(id: "rss", kind: .rss, title: "Feed", url: "https://example.com/feed", colorIndex: 0)])
@@ -57,7 +57,7 @@ import InfluxKit
         #expect(late.body == "late")
         #expect(late.sortDate > read.sortDate)
         let header = RowText.header(late, Typography(scale: 1)).string
-        let received = RowText.laterText(late.sortDate, after: written)
+        let received = RowText.laterText(boosted + 120, after: written)
         #expect(header.hasSuffix("\(written.formatted(.dateTime.weekday(.abbreviated).hour().minute())) → \(received)"))
     }
 }

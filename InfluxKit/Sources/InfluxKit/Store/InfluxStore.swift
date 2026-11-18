@@ -886,7 +886,16 @@ public final class InfluxStore: Sendable {
                 -- to tell it was cut): a row is never built from a whole
                 -- 100,000-character post.
                 substr(i.body, 1, \(TimelineRow.bodyLimit + 1)) AS body, i.url,
-                i.publishedAt, p.sortDate, MIN(i.sortDate, i.fetchedAt) AS postedAt, i.replyToHandle, i.linkCard, i.media, i.quote, i.viewer, i.links, i.badge,
+                i.publishedAt, p.sortDate, MIN(i.sortDate, i.fetchedAt) AS postedAt,
+                -- When the row first arrived here: the earliest fetch of
+                -- any copy, since a copy shown in preference can come
+                -- later than the one that made the row (#282). A row at
+                -- its shown copy's own place needs no lookup.
+                CASE
+                    WHEN p.sortDate = MIN(i.sortDate, i.fetchedAt) THEN i.fetchedAt
+                    ELSE (SELECT MIN(fetchedAt) FROM item WHERE mergeKey = i.mergeKey)
+                END AS fetchedAt,
+                i.replyToHandle, i.linkCard, i.media, i.quote, i.viewer, i.links, i.badge,
                 -- A rich post's thread: from any of its rich copies in scope
                 -- that names one, its own first (TimelineRow.threadItemID).
                 CASE

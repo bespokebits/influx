@@ -127,6 +127,57 @@ import Testing
         #expect(try await offeredPositions(store) == [SyncRecord.name(type: .timelinePosition, key: "feed/y")])
     }
 
+    /// A row held below the line shows when it arrived, not where it sits.
+    /// The report (#282): an article posted at 9:26 sat below a post from
+    /// 19:47 that the reader had reached, and the arrow read 19:47, as if
+    /// the feed had sent it then. It arrived later than that.
+    @Test func aRowBelowTheLineIsReceivedWhenItWasFetched() async throws {
+        let store = try await timeline()
+        try await read(store, to: "c")
+        // Posted before every post, fetched long after the reader read c.
+        try await refresh(store, "feed", [item("feed", "y", at: t0 + 300, fetched: t0 + 9_000)], at: t0 + 9_000)
+        let late = try await row(store, "y")
+        #expect(late.sortDate == (t0 + 1_800).addingTimeInterval(0.001))
+        #expect(late.fetchedAt == t0 + 9_000)
+        #expect(late.receivedAt == t0 + 9_000)
+    }
+
+    /// A copy that arrives later and is the one shown doesn't move the
+    /// received time: the row arrived with its first copy. A view of the
+    /// later copy's source alone shows the row from that copy.
+    @Test func aRowIsReceivedWithItsFirstCopy() async throws {
+        let store = try await timeline()
+        try await read(store, to: "c")
+        let first = Item(sourceID: "social", remoteID: "y", kind: .post, mergeKey: "shared/y", authorName: "social",
+                         authorHandle: "", body: "y", publishedAt: t0 + 300, fetchedAt: t0 + 9_000)
+        try await refresh(store, "social", [first], at: t0 + 9_000)
+        let fuller = Item(sourceID: "feed", remoteID: "y", kind: .article, mergeKey: "shared/y", authorName: "feed",
+                          authorHandle: "", title: "Y", body: "y", publishedAt: t0 + 300, fetchedAt: t0 + 12_000)
+        try await refresh(store, "feed", [fuller], at: t0 + 12_000)
+        for scope in [InfluxStore.Scope.all, .sources(["feed"])] {
+            let rows = try await store.rows(in: scope).filter { $0.mergeKey == "shared/y" }
+            let late = try #require(rows.first)
+            #expect(rows.count == 1)
+            #expect(late.receivedAt == t0 + 9_000)
+        }
+        let shownFromLater = try #require(try await store.rows(in: .sources(["feed"])).first { $0.mergeKey == "shared/y" })
+        #expect(shownFromLater.sourceID == "feed")
+    }
+
+    /// A row at its own time has no received time, however late it was
+    /// fetched: it reads in its turn.
+    @Test func aRowByItsOwnTimeHasNoReceivedTime() async throws {
+        let store = try await timeline()
+        try await read(store, to: "x")
+        try await refresh(store, "feed", [item("feed", "y", at: t0 + 300, fetched: t0 + 9_000)], at: t0 + 9_000)
+        let late = try await row(store, "y")
+        #expect(late.sortDate == t0 + 300)
+        #expect(late.receivedAt == nil)
+        for body in ["x", "a", "b", "c"] {
+            #expect(try await row(store, body).receivedAt == nil)
+        }
+    }
+
     /// A row dated the same millisecond as the line's row is not below it
     /// by its own time: merge keys would decide, and could put it above.
     @Test func aRowDatedWithTheLineGoesBelowIt() async throws {

@@ -50,6 +50,10 @@ public struct TimelineRow: Sendable, Hashable, Identifiable {
     /// When the post was first boosted, for a row with boosters: the
     /// earliest boost in scope, never after it was fetched.
     public var boostedAt: Date? = nil
+    /// When the row first arrived on this device: the earliest fetch of
+    /// any of its copies, which may not be the copy it is shown from. A
+    /// refetch keeps the first time.
+    public var fetchedAt: Date? = nil
     /// The score shown beside the title, for a feed that sends one.
     public var badge: Item.Badge? = nil
     /// Whether the post's thread can be opened, which its service decides
@@ -75,6 +79,26 @@ extension TimelineRow {
     /// several copies is shown from its rich copy when it has one, so that
     /// copy's rule holds for it.
     public var keepsOwnBookmark: Bool { Item.keepsOwnBookmark(kind: kind, sourceKind: isRich ? .sammyFeed : nil) }
+}
+
+extension TimelineRow {
+    /// When a late row arrived on this device, for a row that sits at
+    /// least a minute after its own time (its post's, or its boost's for a
+    /// boosted post): below the reader's line (ADR 0041), where another
+    /// device placed it, or where an earlier copy of the post put it. Nil
+    /// for a row that sits at its own time, and for one that arrived here
+    /// within a minute of its own time.
+    ///
+    /// It is not `sortDate`. A row held below the line sits a millisecond
+    /// after the row the reader had reached, so its `sortDate` is that
+    /// other row's time. That is close to the fetch only when the reader
+    /// was at the bottom (#282).
+    public var receivedAt: Date? {
+        let own = boostedBy.isEmpty ? postedAt : (boostedAt ?? postedAt)
+        guard let own, let fetchedAt, sortDate.timeIntervalSince(own) >= 60,
+              fetchedAt.timeIntervalSince(own) >= 60 else { return nil }
+        return fetchedAt
+    }
 }
 
 extension TimelineRow {
@@ -130,6 +154,7 @@ extension TimelineRow: FetchableRecord {
         sortDate = row["sortDate"]
         postedAt = row["postedAt"]
         boostedAt = row["boostedAt"]
+        fetchedAt = row["fetchedAt"]
         let boosters: String? = row["boosters"]
         boostedBy = boosters.map { $0.components(separatedBy: Self.boosterSeparator) } ?? []
         replyToHandle = row["replyToHandle"]

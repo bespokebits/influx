@@ -30,8 +30,8 @@ enum RowText {
     /// The header shows when the row's post was written. A boosted post
     /// then shows a rocket and when it was boosted (#270): "Sun 8:46 PM
     /// 🚀 9:58 PM". A row that arrived late can sit below its own time's
-    /// place (ADR 0041): it then shows an arrow and the time where it sits,
-    /// in the late colour (#261): "Sun 5:11 PM → 5:19 PM".
+    /// place (ADR 0041): it then shows an arrow and when it arrived on this
+    /// device, in the late colour (#261, #282): "Sun 5:11 PM → 5:19 PM".
     /// `withLater` false leaves the boost and received times out, for a
     /// header too narrow to hold them: they then take a line of their own
     /// (`laterLine`).
@@ -77,15 +77,10 @@ enum RowText {
         return boosted
     }
 
-    /// Where a row that arrived late sits, for one placed at least a
-    /// minute after its own time, or after its boost for a boosted post:
-    /// below the reader's line (ADR 0041), where another device placed it,
-    /// or where an earlier copy of the post put it. Nil for a row that sits
-    /// at its own time.
+    /// When a row that sits away from its own time arrived on this device
+    /// (`TimelineRow.receivedAt`). Nil for any other row.
     static func receivedDate(_ row: TimelineRow) -> Date? {
-        let own = row.boostedBy.isEmpty ? row.postedAt : (row.boostedAt ?? row.postedAt)
-        guard let own, row.sortDate.timeIntervalSince(own) >= 60 else { return nil }
-        return row.sortDate
+        row.receivedAt
     }
 
     /// A later time, with its day only when that differs from the time

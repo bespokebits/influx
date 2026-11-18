@@ -33,11 +33,14 @@ import InfluxKit
         return Dictionary(uniqueKeysWithValues: try await store.rows().map { ($0.body, $0) })
     }
 
-    @Test func aLateRowShowsWhereItSitsAfterItsOwnTime() async throws {
+    /// The arrow's time is when the row arrived, not where it sits: b sits
+    /// just below c, from 30 minutes on, but came 40 minutes on (#282).
+    @Test func aLateRowShowsWhenItArrivedAfterItsOwnTime() async throws {
         let rows = try await rows()
         let b = try #require(rows["b"]), c = try #require(rows["c"])
         let received = try #require(RowText.receivedDate(b))
-        #expect(abs(received.timeIntervalSince(c.sortDate)) < 0.01)
+        #expect(b.sortDate > c.sortDate)
+        #expect(received == t0 + 2_400)
         #expect(RowText.shownDate(b) == t0 + 1_200)
         let time = RowText.time(b, type).string
         #expect(time == " · \(RowText.shownDate(b).formatted(.dateTime.weekday(.abbreviated).hour().minute())) → \(received.formatted(.dateTime.hour().minute()))")
