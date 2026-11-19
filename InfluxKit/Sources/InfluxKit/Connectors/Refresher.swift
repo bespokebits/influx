@@ -219,7 +219,8 @@ public struct Refresher: Sendable {
         guard store.beginRefresh(of: source.id) else { return .busy }
         defer { store.endRefresh(of: source.id) }
         guard let state = try await store.fetchState(sourceID: source.id), state.hasFetchedItems else { return .notFetchedYet }
-        let request = Self.request(for: source, direction: .newer, cursor: state.newerCursor, now: now)
+        var request = Self.request(for: source, direction: .newer, cursor: state.newerCursor, now: now)
+        request.isStream = true
         let page = Self.inWindow(FetchedPage(items: items, newer: advancing(state.newerCursor), older: state.olderCursor), for: source, request: request)
         if Self.isUnchanged(page, state: state, direction: .newer, now: now) {
             return .stored(newItems: 0)

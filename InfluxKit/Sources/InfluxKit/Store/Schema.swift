@@ -443,6 +443,31 @@ enum Schema {
         migrator.registerMigration("v27: posts a catch-up read added") { db in
             try CatchUpRepair.run(db, at: Date())
         }
+        // Why each row sits where it does: how it was placed, what joined
+        // it, and when iCloud moved it (`RowEvent`, ADR 0043). Local only,
+        // never synced; it goes with the row's last item.
+        migrator.registerMigration("v28: row history") { db in
+            try db.create(table: RowEvent.databaseTableName) { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("mergeKey", .text).notNull()
+                t.column("at", .datetime).notNull()
+                t.column("kind", .text).notNull()
+                t.column("sortDate", .datetime).notNull()
+                t.column("sourceID", .text)
+                t.column("remoteID", .text)
+                t.column("publishedAt", .datetime)
+                t.column("fetchedAt", .datetime)
+                t.column("via", .text)
+                t.column("how", .text)
+                t.column("lineView", .text)
+                t.column("lineBound", .text)
+                t.column("lineDate", .datetime)
+                t.column("previous", .datetime)
+                t.column("offered", .boolean).notNull().defaults(to: false)
+            }
+            try db.create(index: "rowEvent_on_mergeKey", on: RowEvent.databaseTableName, columns: ["mergeKey"])
+            try db.create(index: "rowEvent_on_at", on: RowEvent.databaseTableName, columns: ["at"])
+        }
         return migrator
     }
 }

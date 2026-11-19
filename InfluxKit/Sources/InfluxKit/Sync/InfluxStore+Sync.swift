@@ -225,9 +225,13 @@ enum SyncLog {
 
     /// Queues this device's position for a merge group, unless iCloud
     /// already has one or one is queued: the first position stored wins.
-    static func offerPosition(_ db: Database, mergeKey: String, at now: Date) throws {
-        guard try !SyncRecordState.exists(db, key: SyncRecord.name(type: .timelinePosition, key: mergeKey)) else { return }
+    /// Returns whether the position was queued: false when iCloud already
+    /// has, or is about to get, a position for the row.
+    @discardableResult
+    static func offerPosition(_ db: Database, mergeKey: String, at now: Date) throws -> Bool {
+        guard try !SyncRecordState.exists(db, key: SyncRecord.name(type: .timelinePosition, key: mergeKey)) else { return false }
         try recordChange(db, .timelinePosition, key: mergeKey, at: now)
+        return true
     }
 
     /// Queues every source, marker, reading place, article state, setting,
@@ -725,6 +729,7 @@ enum SyncMerge {
         if winner.sortDate != held {
             try db.execute(sql: "UPDATE timelinePosition SET sortDate = ? WHERE mergeKey = ?", arguments: [winner.sortDate, payload.mergeKey])
             try db.execute(sql: "UPDATE lastReadMarker SET sortDate = ? WHERE mergeKey = ?", arguments: [winner.sortDate, payload.mergeKey])
+            try RowEvents.record(RowEvent(mergeKey: payload.mergeKey, at: now, kind: .moved, sortDate: winner.sortDate, previous: held), db)
         }
         return winner == remote ? .tookRemote(modifiedAt: payload.placedAt ?? now) : .keptLocalPosition(placedAt: winner.placedAt)
     }

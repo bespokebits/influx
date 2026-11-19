@@ -7,7 +7,7 @@ import SwiftUI
 import InfluxKit
 
 enum ItemAction: CaseIterable {
-    case openOriginal, openThread, openAuthor, bookmark, copyLink, copyText, share
+    case openOriginal, openThread, openAuthor, bookmark, copyLink, copyText, share, details
 
     var title: String {
         switch self {
@@ -18,6 +18,7 @@ enum ItemAction: CaseIterable {
         case .copyLink: "Copy Link"
         case .copyText: "Copy Text"
         case .share: "Share…"
+        case .details: "Row Details"
         }
     }
 
@@ -30,6 +31,7 @@ enum ItemAction: CaseIterable {
         case .copyLink: "link"
         case .copyText: "doc.on.doc"
         case .share: "square.and.arrow.up"
+        case .details: "info.circle"
         }
     }
 
@@ -57,22 +59,24 @@ enum ItemAction: CaseIterable {
         case .openAuthor: RowText.profileURL(row) != nil
         case .bookmark: RowAction.available(for: row).contains(.bookmark)
         case .copyText: !ItemMenu.text(of: row).isEmpty
+        case .details: true
         }
     }
 
     /// Menus show the opens, then the bookmark, then copying and sharing,
-    /// with separators between.
+    /// then the row's details, with separators between.
     var group: Int {
         switch self {
         case .openOriginal, .openThread, .openAuthor: 0
         case .bookmark: 1
         case .copyLink, .copyText, .share: 2
+        case .details: 3
         }
     }
 
     /// `actions` in their menu groups, leaving out empty ones.
     static func grouped(_ actions: [ItemAction]) -> [[ItemAction]] {
-        (0...2).map { group in actions.filter { $0.group == group } }.filter { !$0.isEmpty }
+        (0...3).map { group in actions.filter { $0.group == group } }.filter { !$0.isEmpty }
     }
 }
 
@@ -106,6 +110,7 @@ enum ItemMenu {
         case .openAuthor: "This item has no author page."
         case .bookmark: "This item can't be bookmarked."
         case .copyText: "This item has no text."
+        case .details: "This item has no details."
         }
     }
 }
@@ -192,6 +197,8 @@ struct ItemCommands: Commands {
             item(.copyLink)
             item(.copyText)
             item(.share)
+            Divider()
+            item(.details).keyboardShortcut("i")
         }
     }
 

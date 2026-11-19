@@ -112,6 +112,9 @@ public struct FetchRequest: Sendable, Hashable {
     /// (`InfluxStore.newestItemDate(sourceID:)`), or nil when it has none:
     /// where a catch-up read begins (`FetchedPage.catchUpFrom`).
     public var newestStored: Date?
+    /// Whether the page comes from a stream rather than a fetch, for the
+    /// row history (`RowEvent.Via`).
+    public var isStream = false
 
     public init(direction: FetchDirection, cursor: Cursor?, notBefore: Date, now: Date, storedRemoteIDs: Set<String> = [],
                 newestStored: Date? = nil) {

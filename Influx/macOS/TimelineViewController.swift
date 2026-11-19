@@ -425,6 +425,8 @@ final class TimelineViewController: NSViewController, TimelineSurface, ItemMenuT
         case .share:
             guard let url = ItemMenu.originalURL(row), let frame = timeline.visibleFrame(of: row) else { return }
             NSSharingServicePicker(items: [url]).show(relativeTo: frame, of: collectionView, preferredEdge: .minY)
+        case .details:
+            presentSheet(RowDetailsScreen(store: app.store, row: row) { [weak self] in self?.closeSheet() })
         }
     }
 

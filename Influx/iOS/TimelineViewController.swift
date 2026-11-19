@@ -424,6 +424,12 @@ final class TimelineViewController: UIViewController, UICollectionViewDelegate, 
                 sheet.popoverPresentationController?.sourceRect = frame
             }
             present(sheet, animated: true)
+        case .details:
+            guard presentedViewController == nil else { return }
+            let screen = RowDetailsScreen(store: app.store, row: row) { [weak self] in self?.dismiss(animated: true) }
+            let host = UIHostingController(rootView: screen)
+            host.modalPresentationStyle = .pageSheet
+            present(host, animated: true)
         }
     }
 

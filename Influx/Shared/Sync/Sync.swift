@@ -209,6 +209,7 @@ final class Sync {
         var lines = ["Influx sync diagnostics, copied \(now.ISO8601Format())"] + header
         let journal = (try? await store.syncJournal(since: now.addingTimeInterval(-diagnosticsWindow))) ?? []
         lines += ["", "Journal, last 48 hours (\(journal.count) line\(journal.count == 1 ? "" : "s"))"] + journal.map(\.line)
+        lines += ["", ""] + rowHistory((try? await store.rowEvents(since: now.addingTimeInterval(-diagnosticsWindow))) ?? [])
         let events = defaults.stringArray(forKey: "InfluxSyncEvents") ?? []
         lines += ["", "iCloud events (\(events.count))"] + events
         if let merge = defaults.string(forKey: "InfluxSyncLastMerge") {
@@ -220,6 +221,21 @@ final class Sync {
             lines += ["", "Timeline now", text]
         }
         return lines.joined(separator: "\n")
+    }
+
+    /// The row history of the window (ADR 0043): each row placed anywhere
+    /// but by its own time, and each row iCloud moved, listed; the rest
+    /// counted by what brought them.
+    nonisolated static func rowHistory(_ events: [RowEvent]) -> [String] {
+        let notable = events.filter(\.isNotable)
+        var counts: [String: Int] = [:]
+        for event in events where !event.isNotable {
+            counts["\(event.kind.rawValue) via \(event.via?.rawValue ?? "?")", default: 0] += 1
+        }
+        let summary = counts.sorted { $0.key < $1.key }.map { "\($0.value) \($0.key)" }.joined(separator: ", ")
+        return ["Row history, last 48 hours: \(events.count) event\(events.count == 1 ? "" : "s"); "
+                + "by own time or joined: \(summary.isEmpty ? "none" : summary)",
+                "Placed below the line, from iCloud, or moved (\(notable.count))"] + notable.map(\.line)
     }
 
     private nonisolated static var platform: String {

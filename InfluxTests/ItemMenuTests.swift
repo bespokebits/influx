@@ -59,7 +59,7 @@ import InfluxKit
 
     @Test func articlesOpenTheirPageAndAreMarkedRead() async throws {
         let row = try await row(article(), source: .rss)
-        #expect(ItemAction.available(for: row) == [.openOriginal, .bookmark, .copyLink, .copyText, .share])
+        #expect(ItemAction.available(for: row) == [.openOriginal, .bookmark, .copyLink, .copyText, .share, .details])
         // The same open as a tap on the article, which marks it read.
         guard case .article(_, let url) = ItemMenu.original(of: row) else {
             Issue.record("an article's original doesn't open the article")
@@ -72,7 +72,7 @@ import InfluxKit
     @Test func itemsWithoutAWebLinkCannotBeOpenedCopiedOrShared() async throws {
         for url in [nil, "at://did:plc:abc/app.bsky.feed.post/1"] {
             let row = try await row(article(url: url), source: .rss)
-            #expect(ItemAction.available(for: row) == [.bookmark, .copyText])
+            #expect(ItemAction.available(for: row) == [.bookmark, .copyText, .details])
             #expect(ItemMenu.original(of: row) == nil)
         }
     }
@@ -88,9 +88,9 @@ import InfluxKit
         #expect(!ItemAction.available(for: try await row(item)).contains(.bookmark))
     }
 
-    @Test func theMenuGroupsOpensThenTheBookmarkThenCopying() {
+    @Test func theMenuGroupsOpensThenTheBookmarkThenCopyingThenDetails() {
         #expect(ItemAction.grouped(ItemAction.allCases) == [
-            [.openOriginal, .openThread, .openAuthor], [.bookmark], [.copyLink, .copyText, .share],
+            [.openOriginal, .openThread, .openAuthor], [.bookmark], [.copyLink, .copyText, .share], [.details],
         ])
         #expect(ItemAction.grouped([.copyText]) == [[.copyText]])
     }

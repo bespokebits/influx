@@ -160,7 +160,7 @@ public final class InfluxStore: Sendable {
     @discardableResult
     public func insert(_ items: [Item], identities: [String: [String]] = [:], belowTheLine: Bool = false) async throws -> Int {
         try await writer.write { [onScreen] db in
-            try Self.insert(items, identities: identities, belowTheLine: belowTheLine ? onScreen.bottoms : nil, db)
+            try Self.insert(items, identities: identities, belowTheLine: belowTheLine ? onScreen.bottoms : nil, via: .direct, db)
         }
     }
 
@@ -175,7 +175,7 @@ public final class InfluxStore: Sendable {
     /// new rows are to stay below their line; nil places every row by its
     /// own time.
     private static func insert(_ items: [Item], identities: [String: [String]] = [:], belowTheLine: [ScreenBottom]? = nil,
-                               catchUpFrom: Date? = nil, _ db: Database) throws -> Int {
+                               catchUpFrom: Date? = nil, via: RowEvent.Via, _ db: Database) throws -> Int {
         var joined = try joiningCopies(items, identities: identities, db)
         if let catchUpFrom {
             joined = try keepingCatchUp(joined, from: catchUpFrom, db)
@@ -232,8 +232,14 @@ public final class InfluxStore: Sendable {
                 INSERT OR IGNORE INTO timelinePosition (mergeKey, sortDate, itemID)
                 VALUES (\(item.mergeKey), \(placedAt), \(id))
                 """)
+            var event = RowEvent(mergeKey: item.mergeKey, at: now, kind: .placed, sortDate: placedAt, sourceID: item.sourceID,
+                                 remoteID: item.remoteID, publishedAt: item.publishedAt, fetchedAt: item.fetchedAt, via: via)
             if db.changesCount > 0 {
                 if let position { line?.placed(at: position) }
+                event.how = synced != nil ? .iCloud : position?.below != nil ? .belowLine : .ownTime
+                event.lineView = position?.line?.viewID
+                event.lineBound = position?.line?.kind.rawValue
+                event.lineDate = position?.line?.date
                 if let synced {
                     try synced.delete(db)
                 } else if placedAt != item.publishedAt {
@@ -241,8 +247,9 @@ public final class InfluxStore: Sendable {
                     // reader's line, which another device may not share, so
                     // iCloud gets this device's position in case it is the
                     // first.
-                    try SyncLog.offerPosition(db, mergeKey: item.mergeKey, at: now)
+                    event.offered = try SyncLog.offerPosition(db, mergeKey: item.mergeKey, at: now)
                 }
+                try RowEvents.record(event, db)
                 // Markers synced before their row arrived can now be placed.
                 let pending = try PendingLastReadMarker.filter(Column("mergeKey") == item.mergeKey).fetchAll(db)
                 for marker in pending {
@@ -254,10 +261,16 @@ public final class InfluxStore: Sendable {
                     }
                     try marker.delete(db)
                 }
-            } else if try Date.fetchOne(db, sql: "SELECT sortDate FROM timelinePosition WHERE mergeKey = ?", arguments: [item.mergeKey]) != item.placement {
-                // A copy that would have placed the row elsewhere: devices
-                // that saw it first can disagree, so offer this position.
-                try SyncLog.offerPosition(db, mergeKey: item.mergeKey, at: now)
+            } else {
+                let held = try Date.fetchOne(db, sql: "SELECT sortDate FROM timelinePosition WHERE mergeKey = ?", arguments: [item.mergeKey])
+                event.kind = .joined
+                event.sortDate = held ?? placedAt
+                if held != item.placement {
+                    // A copy that would have placed the row elsewhere: devices
+                    // that saw it first can disagree, so offer this position.
+                    event.offered = try SyncLog.offerPosition(db, mergeKey: item.mergeKey, at: now)
+                }
+                try RowEvents.record(event, db)
             }
         }
         return inserted
@@ -535,7 +548,7 @@ public final class InfluxStore: Sendable {
         try await writer.write { db in
             guard let home = try Source.fetchOne(db, key: homeSourceID) else { return 0 }
             let items = try Self.joiningCopies(items, db)
-            let inserted = try Self.insert(items.filter { $0.sourceID == homeSourceID }, db)
+            let inserted = try Self.insert(items.filter { $0.sourceID == homeSourceID }, via: .bookmarks, db)
             guard isComplete else { return inserted }
             let sameAccount: SQL = if let accountID = home.accountID {
                 "sourceID IN (SELECT id FROM source WHERE accountID = \(accountID))"
@@ -652,6 +665,7 @@ public final class InfluxStore: Sendable {
             // don't outlive the posts.
             let aged = try String.fetchAll(db, sql: "SELECT mergeKey FROM timelinePosition WHERE mergeKey NOT IN (SELECT mergeKey FROM item)")
             try db.execute(sql: "DELETE FROM timelinePosition WHERE mergeKey NOT IN (SELECT mergeKey FROM item)")
+            try RowEvents.pruneOrphans(db)
             // A synced marker or position whose row never turned up within
             // the longest retention window never will.
             let longAgo = now.addingTimeInterval(-Self.articleRetention)
@@ -676,6 +690,7 @@ public final class InfluxStore: Sendable {
             WHERE s.systemFields IS NOT NULL AND p.mergeKey NOT IN (SELECT mergeKey FROM item)
             """)
         try db.execute(sql: "DELETE FROM timelinePosition WHERE mergeKey NOT IN (SELECT mergeKey FROM item)")
+        try RowEvents.pruneOrphans(db)
     }
 
     // MARK: Fetching
@@ -745,8 +760,11 @@ public final class InfluxStore: Sendable {
             // line. A source's first items, and older pages, keep their
             // own dates.
             let belowTheLine = request.direction == .newer && state.hasFetchedItems
+            let via: RowEvent.Via = request.direction == .older ? .olderPage
+                : !state.hasFetchedItems ? .firstFetch : request.isStream ? .stream : .refresh
             let inserted = try Self.insert(page.items.filter { $0.sourceID == sourceID }, identities: page.identities,
-                                           belowTheLine: belowTheLine ? onScreen.bottoms : nil, catchUpFrom: page.catchUpFrom, db)
+                                           belowTheLine: belowTheLine ? onScreen.bottoms : nil, catchUpFrom: page.catchUpFrom,
+                                           via: via, db)
             let next = state.recording(page, direction: request.direction, at: request.now)
             // A state that moved only its times is left for a while, so a
             // page of posts already stored wakes nothing that observes it.
