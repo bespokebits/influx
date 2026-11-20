@@ -128,10 +128,17 @@ async function api(path, init = {}) {
   return response.status === 204 ? null : response.json();
 }
 
-async function product() {
+async function influxApp() {
   const apps = await api(`/v1/apps?filter[bundleId]=${BUNDLE_ID}`);
   const app = apps.data.find((a) => a.attributes.bundleId === BUNDLE_ID);
   if (!app) fail(`no App Store Connect app for ${BUNDLE_ID}`);
+  return app;
+}
+
+/** Influx and its Xcode Cloud product. Only what runs or reads Xcode Cloud
+ *  asks for the product: the rest works while Xcode Cloud is unavailable. */
+async function product() {
+  const app = await influxApp();
   return { app, product: (await api(`/v1/apps/${app.id}/ciProduct`)).data };
 }
 
@@ -272,7 +279,7 @@ async function previewSetup() {
   } else {
     console.log(`group "${INTERNAL_GROUP}": there already`);
   }
-  const { app: influx } = await product();
+  const influx = await influxApp();
   const source = await internalGroup(influx.id);
   if (!source) fail(`Influx has no group "${INTERNAL_GROUP}" to copy testers from`);
   const wanted = (await api(`/v1/betaGroups/${source.id}/betaTesters?limit=200`)).data;
@@ -407,7 +414,7 @@ function reviewContact() {
 /** Sets what external testing needs and makes the public group, with its
  *  link closed. Safe to run again: it updates what is there. */
 async function prepare() {
-  const { app } = await product();
+  const app = await influxApp();
   const info = { description: DESCRIPTION, feedbackEmail: FEEDBACK_EMAIL, privacyPolicyUrl: PRIVACY_URL };
   const existing = (await api(`/v1/apps/${app.id}/betaAppLocalizations`)).data.find((l) => l.attributes.locale === LOCALE);
   if (existing) {
@@ -466,7 +473,7 @@ async function submit(number, file) {
   if (!existsSync(file)) fail(`no file ${file}`);
   const whatsNew = readFileSync(file, "utf8").trim();
   if (!whatsNew || whatsNew.length > 4000) fail(`${file} must hold 1 to 4,000 characters of "What to Test"`);
-  const { app } = await product();
+  const app = await influxApp();
   const group = await publicGroup(app.id);
   if (!group) fail(`no group "${PUBLIC_GROUP}": run prepare first`);
   const builds = await api(`/v1/builds?filter[app]=${app.id}&filter[version]=${number}&include=buildBetaDetail,preReleaseVersion&limit=10`);
@@ -525,7 +532,7 @@ async function submit(number, file) {
 
 /** Opens the public group's link, capped at `limit` testers. */
 async function publicLink(limit) {
-  const { app } = await product();
+  const app = await influxApp();
   const group = await publicGroup(app.id);
   if (!group) fail(`no group "${PUBLIC_GROUP}": run prepare first`);
   const updated = await api(`/v1/betaGroups/${group.id}`, {
