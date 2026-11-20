@@ -28,6 +28,7 @@ private final class FakeAppAttest: AppAttestService, @unchecked Sendable {
     private var made = 0
     private var _calls: [Call] = []
     private var _invalid: Set<String> = []
+    private var _unsigning: [String: Int] = [:]
 
     init(isSupported: Bool = true, keyFailure: AppAttestError? = nil, assertionFailure: AppAttestError? = nil) {
         self.isSupported = isSupported
@@ -41,6 +42,15 @@ private final class FakeAppAttest: AppAttestService, @unchecked Sendable {
     /// Keys the platform has lost, as after a reinstall.
     func lose(_ keyID: String) {
         _ = lock.withLock { _invalid.insert(keyID) }
+    }
+
+    /// A key the platform still has but fails to sign with, with `code`.
+    func failSigning(_ keyID: String, code: Int) {
+        lock.withLock { _unsigning[keyID] = code }
+    }
+
+    func signAgain(_ keyID: String) {
+        _ = lock.withLock { _unsigning.removeValue(forKey: keyID) }
     }
 
     func generateKey() async throws -> String {
@@ -60,6 +70,7 @@ private final class FakeAppAttest: AppAttestService, @unchecked Sendable {
         if let assertionFailure { throw assertionFailure }
         return try lock.withLock {
             if _invalid.contains(keyID) { throw AppAttestError.invalidKey }
+            if let code = _unsigning[keyID] { throw AppAttestError.failed(code: code) }
             _calls.append(Call(kind: "assert", keyID: keyID, hash: clientDataHash))
             return Data("assertion:\(keyID):\(_calls.count)".utf8)
         }
@@ -118,6 +129,11 @@ private final class FakeWorker: @unchecked Sendable {
     }
 }
 
+/// The platform each request to the signer named, nil for one that didn't.
+private func platforms(_ http: FakeHTTPClient) -> [String?] {
+    http.requests.filter { $0.url?.path == "/oauth/assertion" }.map { $0.value(forHTTPHeaderField: "X-Influx-Platform") }
+}
+
 /// Why each request went without attestation, nil for one that didn't say.
 private func reasons(_ http: FakeHTTPClient) -> [String?] {
     http.requests.filter { $0.url?.path == "/oauth/assertion" }.map { $0.value(forHTTPHeaderField: "X-Influx-Unattested") }
@@ -143,9 +159,10 @@ private func keysHolding(_ keyID: String) throws -> InMemoryCredentialStore {
 }
 
 private func service(
-    _ http: any HTTPClient, _ attest: FakeAppAttest, keys: InMemoryCredentialStore = InMemoryCredentialStore(), platform: CallerAttestation.Platform = .ios
+    _ http: any HTTPClient, _ attest: FakeAppAttest, keys: InMemoryCredentialStore = InMemoryCredentialStore(), platform: CallerAttestation.Platform = .ios,
+    now: @escaping @Sendable () -> Date = { Date() }
 ) -> ClientAssertionService {
-    let attestation = CallerAttestation(service: attest, keys: keys, http: http, crypto: .fake(), platform: platform, appID: appID)
+    let attestation = CallerAttestation(service: attest, keys: keys, http: http, crypto: .fake(), platform: platform, appID: appID, now: now)
     return ClientAssertionService(url: signer, http: http, attestation: attestation)
 }
 
@@ -404,21 +421,152 @@ private func fakeHash(_ data: Data) -> Data {
         #expect(try json(request) == ["aud": "https://auth.example.com", "kid": "client-key"])
         #expect(attest.keysMade == 0)
         #expect(reasons(worker.http) == ["unsupported"])
+        #expect(platforms(worker.http) == ["ios"])
     }
 
-    /// A platform that can't make an assertion with the registered key:
-    /// the request goes without attestation, naming the step and the
-    /// platform's error code, so the Worker's counts show it.
+    /// A platform that can't make an assertion with any key: the request
+    /// goes without attestation, naming the step and the platform's error
+    /// code, so the Worker's counts show it. On the second failure in a
+    /// row the stored key is replaced once, and when the new one fails too
+    /// the request says "reassert": the key wasn't the cause. Later
+    /// requests in the run make no more keys.
     @Test func aFailedAssertionSaysWhyTheRequestIsUnattested() async throws {
         let worker = FakeWorker()
         let attest = FakeAppAttest(assertionFailure: .failed(code: 2))
-        let signing = service(worker.http, attest, keys: try keysHolding("key"))
+        let keys = try keysHolding("key")
+        let signing = service(worker.http, attest, keys: keys)
+        for _ in 0..<3 {
+            _ = try await signing.assertion(for: "https://auth.example.com", keyID: nil)
+        }
+        #expect(paths(worker.http) == [
+            "challenge", "assertion", "challenge", "challenge", "register", "challenge", "assertion", "challenge", "assertion",
+        ])
+        #expect(worker.http.requests.allSatisfy { $0.value(forHTTPHeaderField: "X-Influx-Key") == nil })
+        #expect(reasons(worker.http) == ["assert-failed-dc2", "reassert-failed-dc2", "reassert-failed-dc2"])
+        #expect(platforms(worker.http) == ["ios", "ios", "ios"])
+        #expect(attest.keysMade == 1)
+        #expect(try storedKey(keys) == "key-1")
+    }
+
+    /// One failure is never enough to replace a key: a key that fails once
+    /// and then signs again is kept.
+    @Test func aKeyThatFailsOnceIsKept() async throws {
+        let worker = FakeWorker()
+        let attest = FakeAppAttest()
+        attest.failSigning("old", code: 0)
+        let keys = try keysHolding("old")
+        let signing = service(worker.http, attest, keys: keys)
+        _ = try await signing.assertion(for: "https://auth.example.com", keyID: nil)
+        attest.signAgain("old")
+        _ = try await signing.assertion(for: "https://auth.example.com", keyID: nil)
+        #expect(attest.keysMade == 0)
+        #expect(reasons(worker.http) == ["assert-failed-dc0", nil])
+        #expect(try storedKey(keys) == "old")
+    }
+
+    /// A stored key the platform still has but can't sign with (Influx
+    /// Preview's `assert-failed-dc0`) is replaced, and the request signed
+    /// with the new key.
+    @Test func aKeyThePlatformCannotSignWithIsReplaced() async throws {
+        let worker = FakeWorker()
+        let attest = FakeAppAttest()
+        attest.failSigning("old", code: 0)
+        let keys = try keysHolding("old")
+        let signing = service(worker.http, attest, keys: keys, platform: .mac)
+        _ = try await signing.assertion(for: "https://auth.example.com", keyID: nil)
+        let assertion = try await signing.assertion(for: "https://auth.example.com", keyID: nil)
+        #expect(assertion.jwt == "jwt")
+        #expect(paths(worker.http) == ["challenge", "assertion", "challenge", "challenge", "register", "challenge", "assertion"])
+        #expect(worker.http.requests.last?.value(forHTTPHeaderField: "X-Influx-Key") == "key-1")
+        #expect(reasons(worker.http) == ["assert-failed-dc0", nil])
+        #expect(platforms(worker.http) == ["mac", nil])
+        #expect(try storedKey(keys) == "key-1")
+    }
+
+    /// The old key stays until its replacement registers: a failure might
+    /// pass, and an install that loses its key for nothing has to spend a
+    /// new one later.
+    @Test func theOldKeyStaysWhenItsReplacementCannotRegister() async throws {
+        let worker = FakeWorker(registrations: [FakeWorker.refusal(401, "attestation_invalid")])
+        let attest = FakeAppAttest()
+        attest.failSigning("old", code: 0)
+        let keys = try keysHolding("old")
+        let signing = service(worker.http, attest, keys: keys)
         for _ in 0..<2 {
             _ = try await signing.assertion(for: "https://auth.example.com", keyID: nil)
         }
-        #expect(paths(worker.http) == ["challenge", "assertion", "challenge", "assertion"])
-        #expect(worker.http.requests.allSatisfy { $0.value(forHTTPHeaderField: "X-Influx-Key") == nil })
-        #expect(reasons(worker.http) == ["assert-failed-dc2", "assert-failed-dc2"])
+        #expect(reasons(worker.http) == ["assert-failed-dc0", "register-refused"])
+        #expect(try storedKey(keys) == "old")
+        // The next request tries the old key again, and replaces nothing.
+        _ = try await signing.assertion(for: "https://auth.example.com", keyID: nil)
+        #expect(paths(worker.http).suffix(2) == ["challenge", "assertion"])
+        #expect(reasons(worker.http).last == "assert-failed-dc0")
+        #expect(attest.keysMade == 1)
+    }
+
+    /// Apple counts every key, so an install replaces one at most once a
+    /// day, across launches.
+    @Test func anInstallReplacesAKeyAtMostOnceADay() async throws {
+        let attest = FakeAppAttest(assertionFailure: .failed(code: 0))
+        let keys = try keysHolding("old")
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        func run(after seconds: TimeInterval) async throws -> String? {
+            let worker = FakeWorker()
+            let signing = service(worker.http, attest, keys: keys, now: { start.addingTimeInterval(seconds) })
+            for _ in 0..<2 {
+                _ = try await signing.assertion(for: "https://auth.example.com", keyID: nil)
+            }
+            return reasons(worker.http).last ?? nil
+        }
+        #expect(try await run(after: 0) == "reassert-failed-dc0")
+        // Later launches make no key, and still say the replacement failed.
+        #expect(try await run(after: 60 * 60) == "reassert-failed-dc0")
+        #expect(try await run(after: 23 * 60 * 60) == "reassert-failed-dc0")
+        #expect(attest.keysMade == 1)
+        #expect(try await run(after: 24 * 60 * 60) == "reassert-failed-dc0")
+        #expect(attest.keysMade == 2)
+    }
+
+    /// "reassert" belongs to the replacement key only: a key registered
+    /// another way, after the replacement was lost, says "assert" again.
+    @Test func onlyTheReplacementKeySaysReassert() async throws {
+        let attest = FakeAppAttest()
+        attest.failSigning("old", code: 0)
+        let keys = try keysHolding("old")
+        let replacing = FakeWorker()
+        let first = service(replacing.http, attest, keys: keys)
+        for _ in 0..<2 {
+            _ = try await first.assertion(for: "https://auth.example.com", keyID: nil)
+        }
+        attest.failSigning("key-1", code: 4)
+        let worker = FakeWorker()
+        _ = try await service(worker.http, attest, keys: keys).assertion(for: "https://auth.example.com", keyID: nil)
+        #expect(reasons(worker.http) == ["reassert-failed-dc4"])
+        attest.lose("key-1")
+        attest.failSigning("key-2", code: 4)
+        let again = FakeWorker()
+        _ = try await service(again.http, attest, keys: keys).assertion(for: "https://auth.example.com", keyID: nil)
+        #expect(try storedKey(keys) == "key-2")
+        #expect(reasons(again.http) == ["assert-failed-dc4"])
+    }
+
+    /// A key that's gone (`invalidKey`) is the case above it: replaced at
+    /// once, whatever the daily limit, since it can never sign again.
+    @Test func aLostKeyIsReplacedWhateverTheDailyLimit() async throws {
+        let attest = FakeAppAttest()
+        attest.failSigning("old", code: 0)
+        let keys = try keysHolding("old")
+        let worker = FakeWorker()
+        let first = service(worker.http, attest, keys: keys)
+        for _ in 0..<2 {
+            _ = try await first.assertion(for: "https://auth.example.com", keyID: nil)
+        }
+        #expect(try storedKey(keys) == "key-1")
+        attest.lose("key-1")
+        let again = FakeWorker()
+        _ = try await service(again.http, attest, keys: keys).assertion(for: "https://auth.example.com", keyID: nil)
+        #expect(paths(again.http) == ["challenge", "challenge", "register", "challenge", "assertion"])
+        #expect(try storedKey(keys) == "key-2")
     }
 
     /// A key the platform can't make stops registering for the run, and

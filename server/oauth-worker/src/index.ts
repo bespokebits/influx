@@ -190,28 +190,32 @@ export const SMOKE_AGENT = "influx-deploy-check";
  * User-Agent, "<bundle name>/<build> CFNetwork/…". Anyone can send either,
  * so it is used for nothing but the count. An app's name carries the reason
  * it gave for asking unattested (`UNATTESTED_HEADER`), so an install that
- * can't attest shows why without its logs. Names and reasons come from fixed
- * sets, with no build number, so a caller cannot fill the day's events with
- * names.
+ * can't attest shows why without its logs, and the platform it runs on
+ * (`PLATFORM_HEADER`), since the iPhone and the Mac send the same
+ * User-Agent. Names, platforms and reasons come from fixed sets, with no
+ * build number, so a caller cannot fill the day's events with names.
  */
 export function unattestedSource(request: Request): string {
   const agent = request.headers.get("User-Agent") ?? "";
   if (agent === SMOKE_AGENT) return "unattested: deploy check";
   const app = /^Influx(%20(?:Dev|Test|Perf|Preview))?\/\d+ CFNetwork\//.exec(agent);
   if (!app) return "unattested: other";
-  const name = `unattested: Influx${app[1] ? ` ${app[1].slice(3)}` : ""}`;
+  const platform = request.headers.get(PLATFORM_HEADER);
+  const name = `unattested: Influx${app[1] ? ` ${app[1].slice(3)}` : ""}${platform === "ios" || platform === "mac" ? ` ${platform}` : ""}`;
   const reason = request.headers.get(UNATTESTED_HEADER);
   return reason !== null && UNATTESTED_REASON.test(reason) ? `${name} (${reason})` : name;
 }
 
 /** Why the app asked without attestation, from InfluxKit's `CallerAttestation`. */
 export const UNATTESTED_HEADER = "X-Influx-Unattested";
+/** The platform an app's unattested request comes from, `ios` or `mac`. */
+export const PLATFORM_HEADER = "X-Influx-Platform";
 /**
  * The reasons it gives: which step failed, with DeviceCheck's error code
  * (0 to 9) where the platform failed. Anything else is left out of the name.
  */
 const UNATTESTED_REASON =
-  /^(?:unsupported|key-lost|register-paused|challenge-refused|register-refused|register-failed-other|(?:key|attest|assert)-failed-(?:dc\d|other))$/;
+  /^(?:unsupported|key-lost|register-paused|challenge-refused|register-refused|register-failed-other|(?:key|attest|assert|reassert)-failed-(?:dc\d|other))$/;
 
 /**
  * Today's count against the daily limit, for a volume alert, and how many

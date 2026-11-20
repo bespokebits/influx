@@ -1,7 +1,8 @@
 // Run with: node --experimental-strip-types --test test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import worker, { clientId, clientMetadata, DailyCount, HOSTS, isPlainHttpsOrigin, SMOKE_AGENT, UNATTESTED_HEADER, unattestedSource, type Env } from "../src/index.ts";
+import worker, { clientId, clientMetadata, DailyCount, HOSTS, isPlainHttpsOrigin, PLATFORM_HEADER, SMOKE_AGENT, UNATTESTED_HEADER, unattestedSource, type Env } from "../src/index.ts";
+import { attestedSource } from "../src/callers.ts";
 import { memoryState, memoryStorage } from "./helpers.ts";
 
 const FLUX = "https://flux.bespokebits.dev";
@@ -324,6 +325,29 @@ test("unattested requests are counted by where they came from", () => {
   assert.equal(from("Influx%20Evil/3 CFNetwork/1"), "unattested: other");
   assert.equal(from("curl/8.0"), "unattested: other");
   assert.equal(from(), "unattested: other");
+});
+
+test("an app's unattested request names its platform, if it is one the app runs on", () => {
+  const from = (platform: string, reason = "assert-failed-dc0") =>
+    unattestedSource(
+      new Request(`${FLUX}/oauth/assertion`, {
+        method: "POST",
+        headers: { "User-Agent": "Influx%20Preview/2611201400 CFNetwork/3860.100.1 Darwin/27.2.0", [UNATTESTED_HEADER]: reason, [PLATFORM_HEADER]: platform },
+      }),
+    );
+  assert.equal(from("ios"), "unattested: Influx Preview ios (assert-failed-dc0)");
+  assert.equal(from("mac", "reassert-failed-dc0"), "unattested: Influx Preview mac (reassert-failed-dc0)");
+  assert.ok(from("mac", "register-failed-other").length <= 80);
+  for (const platform of ["iphone", "IOS", "watch", ""]) {
+    assert.equal(from(platform), "unattested: Influx Preview (assert-failed-dc0)", platform);
+  }
+});
+
+test("attested requests are counted by the app and platform their key was registered for", () => {
+  assert.equal(attestedSource({ appId: "dev.bespokebits.influx", platform: "ios" }), "attested: Influx ios");
+  assert.equal(attestedSource({ appId: "dev.bespokebits.influx.preview", platform: "mac" }), "attested: Influx Preview mac");
+  assert.equal(attestedSource({ appId: "dev.bespokebits.influx.dev", platform: "ios" }), "attested: Influx Dev ios");
+  assert.equal(attestedSource({ appId: "com.example.other", platform: "mac" }), "attested: other mac");
 });
 
 test("an app's unattested request is counted with the reason it gave, if the reason is one it may give", () => {

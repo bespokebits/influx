@@ -4,7 +4,7 @@
 // that challenge, then for each assertion request asks for another and
 // signs the request, which names it, with the key.
 
-import { APPLE_ROOTS, ATTESTED_APPS, verifyAssertion, verifyAttestation, type Roots, type VerifiedAttestation } from "./attest.ts";
+import { APPLE_ROOTS, ATTESTED_APPS, PREVIEW_APP, verifyAssertion, verifyAttestation, type Roots, type VerifiedAttestation } from "./attest.ts";
 import { base64url, fromBase64, refuse, Refusal, toBase64 } from "./bytes.ts";
 import { bodyBytes, error, json, jsonObject } from "./http.ts";
 import type { Env } from "./index.ts";
@@ -51,6 +51,22 @@ export async function note(env: Env, name: string): Promise<void> {
     // Only a count is lost.
   }
 }
+
+/**
+ * Which app and platform an attested request came from, for the day's
+ * counts, as Apple attested them when the key was registered: so the counts
+ * show which installs attest, beside those that can't (`unattested: …`).
+ */
+export function attestedSource(record: Pick<KeyRecord, "appId" | "platform">): string {
+  const app = ATTESTED_APP_NAMES[record.appId] ?? "other";
+  return `attested: ${app} ${record.platform === "mac" ? "mac" : "ios"}`;
+}
+
+const ATTESTED_APP_NAMES: Readonly<Record<string, string>> = {
+  "dev.bespokebits.influx": "Influx",
+  [PREVIEW_APP]: "Influx Preview",
+  "dev.bespokebits.influx.dev": "Influx Dev",
+};
 
 /** Whether the caller's address is over the shared per-minute limit. */
 export async function rateLimited(request: Request, env: Env): Promise<boolean> {
@@ -329,6 +345,7 @@ export async function attestedCaller(
     );
     if (advanced.status !== 204) refuse("counter: not increasing");
     if (wantsMetric(env, record, Date.now())) await catchUpMetric(env, options, key, record);
+    await note(env, attestedSource(record));
     return { attested: "attested", appId: record.appId };
   } catch (caught) {
     if (caught instanceof Refusal) {

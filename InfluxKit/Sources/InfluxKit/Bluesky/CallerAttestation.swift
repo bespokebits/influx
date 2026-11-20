@@ -54,6 +54,19 @@ public actor CallerAttestation {
     /// of reasons, which the Worker counts by app, so a failure on a device
     /// shows without its logs.
     static let unattestedHeader = "X-Influx-Unattested"
+    /// On a request that goes without attestation, the platform (`ios` or
+    /// `mac`): the iPhone and the Mac send the same User-Agent.
+    static let platformHeader = "X-Influx-Platform"
+    /// When this install last replaced a key the platform couldn't sign
+    /// with, as seconds since 1970, in `keys`.
+    static let replacedAccount = "app-attest-replaced"
+    /// The key ID of the last such replacement, in `keys`, so every later
+    /// failure of that key, in any launch, says `reassert`.
+    static let replacementAccount = "app-attest-replacement"
+    /// How long after replacing a key the install may replace one again.
+    /// Apple counts every key it attests for a device, so a platform that
+    /// fails for every key costs at most one a day.
+    static let replaceInterval: TimeInterval = 24 * 60 * 60
 
     public nonisolated let service: any AppAttestService
     let keys: any CredentialStore
@@ -61,6 +74,7 @@ public actor CallerAttestation {
     let sha256: @Sendable (Data) -> Data
     let platform: Platform
     let appID: String
+    let now: @Sendable () -> Date
 
     /// The registered key, once read from `keys`; nil inside when there is
     /// none.
@@ -79,18 +93,28 @@ public actor CallerAttestation {
     /// Set once this run has made a key that isn't registered yet, so a
     /// throttled registration knows a retry would make a second one.
     private var madeUnregisteredKey = false
+    /// Set once this run has replaced a key, or tried to.
+    private var replacedThisRun = false
+    /// The stored key's assertions the platform has failed in a row this
+    /// run. A key is replaced only on the second, never on a first failure.
+    private var failedAssertions = 0
     private var busy = false
     private var waiting: [CheckedContinuation<Void, Never>] = []
 
     /// `keys` keeps the registered key ID, on this device only (the key
-    /// itself never leaves it); `appID` is the app's bundle ID.
-    public init(service: any AppAttestService, keys: any CredentialStore, http: any HTTPClient, crypto: OAuthCrypto, platform: Platform, appID: String) {
+    /// itself never leaves it); `appID` is the app's bundle ID; `now`
+    /// dates key replacements.
+    public init(
+        service: any AppAttestService, keys: any CredentialStore, http: any HTTPClient, crypto: OAuthCrypto, platform: Platform, appID: String,
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) {
         self.service = service
         self.keys = keys
         self.http = http
         sha256 = crypto.sha256
         self.platform = platform
         self.appID = appID
+        self.now = now
     }
 
     /// POSTs the JSON `body` makes to `url`, attested where the platform
@@ -104,6 +128,11 @@ public actor CallerAttestation {
     /// registers at most once. An install that can't register (the platform
     /// fails, or the Worker refuses the attestation for anything but
     /// policy) asks without attestation, and the Worker decides.
+    ///
+    /// A stored key the platform fails to sign with twice in a row (any
+    /// DeviceCheck error but `invalidKey`) is replaced once: a new key is
+    /// registered, and the old one is kept until it is. An install
+    /// replaces a key this way at most once a day (`replaceInterval`).
     public func send(to url: URL, body: @Sendable (_ challenge: String?) throws -> Data) async throws -> (Data, HTTPURLResponse) {
         guard service.isSupported else { return try await unattested(url, body, because: "unsupported") }
         await takeTurn()
@@ -113,6 +142,7 @@ public actor CallerAttestation {
         let origin = BlueskyOAuth.origin(url)
         var registered = false
         var retried = false
+        var replaced = false
         while true {
             let key: String
             switch try await self.key(origin: origin, registered: &registered) {
@@ -125,6 +155,7 @@ public actor CallerAttestation {
                 let challenge = try await challenge(origin)
                 request = Self.request(url, try body(challenge))
                 assertion = try await service.generateAssertion(key, clientDataHash: sha256(request.httpBody ?? Data()))
+                failedAssertions = 0
             } catch AppAttestError.invalidKey {
                 // The key is gone from this device: a new one, once.
                 forgetKey()
@@ -135,7 +166,23 @@ public actor CallerAttestation {
                 return try await unattested(url, body, because: error.code)
             } catch let error where Self.isServiceFailure(error) {
                 AuthLog.cannotAttest("assertion: \(error)")
-                return try await unattested(url, body, because: Self.reason("assert", error))
+                failedAssertions += 1
+                if !registered, failedAssertions >= 2, case AppAttestError.failed = error, mayReplaceKey() {
+                    // A key this install has kept but can no longer sign
+                    // with: a new one, keeping the old until it registers.
+                    registered = true
+                    replaced = true
+                    noteReplacement()
+                    switch try await registerKey(origin: origin) {
+                    case let .key(new):
+                        try? keys.setData(Data(new.utf8), for: Self.replacementAccount)
+                        continue
+                    case let .none(reason): return try await unattested(url, body, because: reason)
+                    }
+                }
+                // "reassert": a replacement key fails too, so the key wasn't the cause.
+                let step = replaced || isReplacement(key) ? "reassert" : "assert"
+                return try await unattested(url, body, because: Self.reason(step, error))
             }
             request.setValue(key, forHTTPHeaderField: Self.keyHeader)
             request.setValue(assertion.base64EncodedString(), forHTTPHeaderField: Self.assertionHeader)
@@ -174,6 +221,13 @@ public actor CallerAttestation {
         // This call registered and the key is gone again at once.
         guard !registered else { return .none(reason: "key-lost") }
         registered = true
+        return try await registerKey(origin: origin)
+    }
+
+    /// Registers a new key and keeps it in place of any stored one, or
+    /// says why the request has to go unattested. A key already stored
+    /// stays if registering fails.
+    private func registerKey(origin: URL) async throws -> KeyLookup {
         let failure: String
         do {
             let key = try await register(origin: origin)
@@ -224,6 +278,30 @@ public actor CallerAttestation {
     private func forgetKey() {
         cachedKey = .some(nil)
         try? keys.deleteData(for: Self.keyAccount)
+    }
+
+    /// Whether a key the platform can't sign with may be replaced now: once
+    /// a run, and not within `replaceInterval` of the last replacement. A
+    /// date in the future (the clock moved back) doesn't block it.
+    private func mayReplaceKey() -> Bool {
+        guard !replacedThisRun else { return false }
+        guard let stored = (try? keys.data(for: Self.replacedAccount)).flatMap({ $0 }),
+              let last = TimeInterval(String(decoding: stored, as: UTF8.self))
+        else { return true }
+        let since = now().timeIntervalSince1970 - last
+        return since < 0 || since >= Self.replaceInterval
+    }
+
+    /// Whether `key` is the one the last replacement registered.
+    private func isReplacement(_ key: String) -> Bool {
+        (try? keys.data(for: Self.replacementAccount)).flatMap { $0 }.map { String(decoding: $0, as: UTF8.self) } == key
+    }
+
+    /// Records a replacement before it's tried, so a failing one is not
+    /// tried again on every launch.
+    private func noteReplacement() {
+        replacedThisRun = true
+        try? keys.setData(Data(String(now().timeIntervalSince1970).utf8), for: Self.replacedAccount)
     }
 
     /// Makes a key, has Apple attest it over a fresh challenge, and
@@ -330,6 +408,7 @@ public actor CallerAttestation {
     ) async throws -> (Data, HTTPURLResponse) {
         var request = Self.request(url, try body(nil))
         request.setValue(reason, forHTTPHeaderField: Self.unattestedHeader)
+        request.setValue(platform.rawValue, forHTTPHeaderField: Self.platformHeader)
         return try await http.send(request)
     }
 

@@ -785,8 +785,15 @@ test("usage counts attested and unattested assertions for the day", async () => 
     limit: 2000,
     attested: 1,
     unattested: 2,
-    // The refused request is counted by the check that failed.
-    events: { challenge: 3, "register ios: ok": 1, "unattested: other": 2, "assertion: counter: not increasing": 1 },
+    // The refused request is counted by the check that failed, the
+    // attested one by the app and platform its key was registered for.
+    events: {
+      challenge: 3,
+      "register ios: ok": 1,
+      "unattested: other": 2,
+      "attested: Influx ios": 1,
+      "assertion: counter: not increasing": 1,
+    },
   });
 });
 
