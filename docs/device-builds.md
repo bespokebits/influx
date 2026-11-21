@@ -7,6 +7,68 @@ App Store Connect stop answering. It can last weeks. Influx and a sibling app
 on the same account lost TestFlight at the same time. These are the lessons,
 so the next outage costs an hour, not a day.
 
+## Steps: a build on the devices while TestFlight is down
+
+On the build machine, in a session of its own (not over SSH), from an
+up-to-date checkout of `main` or the branch to try:
+
+1. Once per machine, set what the script can't guess in
+   `~/.config/influx/devices.conf` (local, never committed, no secrets):
+
+   ```sh
+   # A wrapper in place of xcodebuild, if the machine needs one; it must keep
+   # the build products after it returns.
+   INFLUX_LOCAL_XCODEBUILD="<wrapper> --"
+   # The test iPhone (xcrun devicectl list devices); else the first paired one.
+   INFLUX_IPHONE=<iPhone UDID>
+   # The test Mac's provisioning UDID, checked against the Mac profile.
+   INFLUX_TEST_MAC=<Mac provisioning UDID>
+   # A folder the test Mac can read, for the Mac zip.
+   INFLUX_LOCAL_BUILD_OUT=<shared folder>
+   ```
+
+2. Build and install on the iPhone. The phone must be paired, unlocked once
+   since it started, and in Developer Mode.
+
+   ```sh
+   scripts/local-device-build.sh ios
+   ```
+
+   It ends `done: Influx Preview <version> (<build>) from <commit> is on the iPhone`.
+
+3. Build for the Mac:
+
+   ```sh
+   scripts/local-device-build.sh mac
+   ```
+
+   It ends `done: <folder>/Influx-Preview-<commit>.zip`.
+
+4. On the test Mac, quit Influx Preview, then unpack, check and open the
+   build (put the zip's path from step 3, as the test Mac sees it, in `zip`):
+
+   ```sh
+   set -e; zip="<path to Influx-Preview-<commit>.zip>"
+   mkdir -p ~/Applications/InfluxLocal && cd ~/Applications/InfluxLocal
+   rm -rf "Influx Preview.app" && ditto -x -k "$zip" .
+   xattr -dr com.apple.quarantine "Influx Preview.app"
+   codesign --verify --deep --strict "Influx Preview.app" && echo "signature ok"
+   open "Influx Preview.app"
+   ```
+
+   It prints `signature ok` and opens the app. If the app won't open, run
+   `system_profiler SPHardwareDataType | grep "Provisioning UDID"` and check
+   that the UDID is in the Mac profile.
+
+5. Check the build: the version line on the Sources screen (the About panel
+   on the Mac) names the commit, and your
+   feeds, saved views and sign-ins are there (Preview shares them with the
+   production app).
+
+If a step fails, the script prints the failing check and the build log's path.
+A profile that has expired, or one that doesn't list the device, can't be fixed
+until Apple's services work again (see below).
+
 ## What the outage looks like
 
 - The App Store Connect API answers `404 NOT_FOUND` ("The specified resource
